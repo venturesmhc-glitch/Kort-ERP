@@ -8,6 +8,7 @@ import { listPublicCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
 import { crearTurnoRequest, listSlotsDisponiblesRequest } from '../turnos/turnos.api';
 import type { Turno } from '../turnos/turnos.types';
+import { clearPendingMerchSaleId, loadPendingMerchSaleId } from '../public-store/store.types';
 import { formatDate, todayIso } from '../../lib/format';
 
 const TODAY = todayIso();
@@ -110,8 +111,10 @@ export function TurnoWizardPage() {
         hora,
         tipoCorteId,
         tipoCorteNombre,
+        merchSaleId: loadPendingMerchSaleId() ?? undefined,
       });
       clearTurnoDraft();
+      clearPendingMerchSaleId();
       setTurnoConfirmado(turno);
       setStep(6);
     } catch (err) {

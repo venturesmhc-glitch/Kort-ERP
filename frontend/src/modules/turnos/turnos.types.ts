@@ -53,4 +53,9 @@ export interface Turno {
   estado: TurnoEstado;
 }
 
-export type TurnoInput = Omit<Turno, 'id' | 'codigo' | 'estado'>;
+export type TurnoInput = Omit<Turno, 'id' | 'codigo' | 'estado'> & {
+  // Vinculo opcional con un pedido de merch ya confirmado (ver
+  // public-store/store.types.ts), cuando el cliente paso por "ver mercancia"
+  // antes de confirmar el turno.
+  merchSaleId?: string;
+};

@@ -17,6 +17,7 @@ import { salesRouter } from './modules/sales/sales.routes.js';
 import { treasuryRouter } from './modules/treasury/treasury.routes.js';
 import { workshiftsRouter } from './modules/workshifts/workshifts.routes.js';
 import { statsRouter } from './modules/stats/stats.routes.js';
+import { merchRouter, publicMerchRouter } from './modules/merch/merch.routes.js';
 
 export const app = express();
 
@@ -43,8 +44,10 @@ app.use('/api/sales', salesRouter);
 app.use('/api/treasury', treasuryRouter);
 app.use('/api/workshifts', workshiftsRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/merch', merchRouter);
+app.use('/api/public/merch', publicMerchRouter);
 
-// Modulos futuros (dashboard, settings, merch) se montan aca a medida que se
+// Modulos futuros (dashboard, settings) se montan aca a medida que se
 // implementen.
 
 app.use(errorHandler);

@@ -111,6 +111,7 @@ model Appointment {
   updatedAt       DateTime          @updatedAt
 
   cut Cut?
+  merchSale Sale?
 
   @@unique([barberoId, scheduledAt])
   @@map("appointments")
@@ -223,20 +224,37 @@ enum SaleChannel {
   MERCH
 }
 
+// COMPLETED es el estado implicito de toda venta POS (se cobra y entrega en
+// el momento, no tiene ciclo de vida). Los pedidos MERCH (etapa 11, checkout
+// publico sin pasarela) arrancan en PENDING_PICKUP y el Encargado/Dev los
+// pasa a DELIVERED (retirado y pagado en el local) o CANCELLED, ver
+// merch.service.ts.
+enum SaleStatus {
+  COMPLETED
+  PENDING_PICKUP
+  DELIVERED
+  CANCELLED
+}
+
 // Modulo Ventas: venta tipo carrito (Sale + SaleItem) para poder reutilizar el
-// mismo modelo desde el futuro checkout publico de merch (etapa 11), via
-// channel. sellerId es opcional porque ese checkout no tiene usuario logueado;
-// las ventas del panel (channel POS) siempre lo llevan. El precio de cada item
-// es un snapshot (SaleItem.unitPrice), igual que Cut.price.
+// mismo modelo desde el checkout publico de merch (etapa 11), via channel.
+// sellerId es opcional porque ese checkout no tiene usuario logueado; las
+// ventas del panel (channel POS) siempre lo llevan. El precio de cada item es
+// un snapshot (SaleItem.unitPrice), igual que Cut.price. appointmentId es el
+// vinculo opcional con el turno cuando el pedido surge del flujo "ver
+// mercancia" del wizard publico (ver appointments.service.ts).
 model Sale {
-  id          String      @id @default(uuid())
-  channel     SaleChannel @default(POS)
-  clientId    String?
-  client      Client?     @relation(fields: [clientId], references: [id])
-  sellerId    String?
-  seller      User?       @relation(fields: [sellerId], references: [id])
-  totalAmount Int
-  createdAt   DateTime    @default(now())
+  id            String      @id @default(uuid())
+  channel       SaleChannel @default(POS)
+  status        SaleStatus  @default(COMPLETED)
+  clientId      String?
+  client        Client?     @relation(fields: [clientId], references: [id])
+  sellerId      String?
+  seller        User?       @relation(fields: [sellerId], references: [id])
+  appointmentId String?     @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  totalAmount   Int
+  createdAt     DateTime    @default(now())
 
   items         SaleItem[]
   treasuryEntry TreasuryEntry?

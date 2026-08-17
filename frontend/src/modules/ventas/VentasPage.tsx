@@ -3,6 +3,12 @@ import { crearVentaRequest, listVentasRequest, type ListVentasFiltros } from './
 import { VentaForm } from './VentaForm';
 import type { Venta } from './ventas.types';
 import type { CrearVentaInput } from './ventas.api';
+import {
+  cancelarMerchPedidoRequest,
+  listMerchPendientesRequest,
+  marcarMerchEntregadoRequest,
+  type MerchPedido,
+} from './merchPendientes.api';
 import { listPublicArticulosRequest } from '../articulos/articulos.api';
 import type { Articulo } from '../articulos/articulos.types';
 import { formatCurrency, formatDate, toLocalIso } from '../../lib/format';
@@ -20,6 +26,7 @@ export function VentasPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filtros, setFiltros] = useState<ListVentasFiltros>({});
+  const [pedidosMerch, setPedidosMerch] = useState<MerchPedido[]>([]);
 
   async function loadVentas(activeFiltros: ListVentasFiltros) {
     setLoading(true);
@@ -30,8 +37,15 @@ export function VentasPage() {
     }
   }
 
+  function loadPedidosMerch() {
+    listMerchPendientesRequest()
+      .then(setPedidosMerch)
+      .catch(() => setPedidosMerch([]));
+  }
+
   useEffect(() => {
     loadVentas(filtros);
+    loadPedidosMerch();
     listPublicArticulosRequest().then(setArticulos).catch(() => setArticulos([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -40,6 +54,18 @@ export function VentasPage() {
     await crearVentaRequest(values);
     setShowForm(false);
     await loadVentas(filtros);
+  }
+
+  async function handleEntregarMerch(id: string) {
+    await marcarMerchEntregadoRequest(id);
+    loadPedidosMerch();
+    await loadVentas(filtros);
+  }
+
+  async function handleCancelarMerch(id: string) {
+    if (!confirm('¿Cancelar este pedido? El stock reservado se devuelve.')) return;
+    await cancelarMerchPedidoRequest(id);
+    loadPedidosMerch();
   }
 
   function handleFiltrar() {
@@ -61,6 +87,47 @@ export function VentasPage() {
 
       {showForm && <VentaForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />}
 
+      <h2>Pedidos de merch pendientes de retiro</h2>
+      <div className="table-wrap" style={{ marginBottom: '1.5rem' }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Cliente</th>
+              <th>Telefono</th>
+              <th>Articulos</th>
+              <th>Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {pedidosMerch.map((pedido) => (
+              <tr key={pedido.id}>
+                <td>{fechaHora(pedido.fecha)}</td>
+                <td>{pedido.clienteNombre ?? '-'}</td>
+                <td>{pedido.clienteTelefono ?? '-'}</td>
+                <td>{pedido.items.map((item) => `${item.articuloNombre} x${item.cantidad}`).join(', ')}</td>
+                <td>{formatCurrency(pedido.total)}</td>
+                <td className="data-table-actions">
+                  <button type="button" onClick={() => handleEntregarMerch(pedido.id)}>
+                    Entregar
+                  </button>
+                  <button type="button" onClick={() => handleCancelarMerch(pedido.id)}>
+                    Cancelar
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {pedidosMerch.length === 0 && (
+              <tr>
+                <td colSpan={6}>No hay pedidos de merch pendientes de retiro.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Ventas de mostrador</h2>
       <div className="stat-row">
         <div className="stat-tile">
           <span className="stat-label">Ventas registradas</span>

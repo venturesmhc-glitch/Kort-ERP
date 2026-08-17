@@ -192,6 +192,7 @@ export async function crearTurnoRequest(input: TurnoInput): Promise<Turno> {
       tipoCorteId: input.tipoCorteId,
       date: input.fecha,
       time: input.hora,
+      merchSaleId: input.merchSaleId,
     },
   });
   return toTurno(dto);

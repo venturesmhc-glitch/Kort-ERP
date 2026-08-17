@@ -66,14 +66,6 @@ export const NotificationService = {
   },
 };
 
-// Punto de integracion futuro con el modulo Stock/Merch: cuando exista, la oferta
-// "Ver mercancia" del wizard publico deberia poder reservar stock asociado a este
-// turno. Todavia no se implementa la reserva de stock, esta interfaz queda como
-// el punto donde conectarla sin tocar el resto del flujo de creacion de turnos.
-export interface MerchReservationHook {
-  reserveForAppointment(appointmentId: string): Promise<void>;
-}
-
 // --- Configuracion global (slotMinutes) ---
 
 async function getOrCreateSettings() {
@@ -205,6 +197,18 @@ const APPOINTMENT_INCLUDE = {
   tipoCorte: { select: { id: true, name: true } },
 } satisfies Prisma.AppointmentInclude;
 
+// Vinculo opcional con un pedido de merch ya confirmado (ver
+// merch.service.ts / StorePage.tsx: "ver mercancia" antes de confirmar el
+// turno). Es un vinculo best-effort - si el pedido ya no es valido (ya
+// reclamado, no existe, no es de canal MERCH) no bloqueamos la creacion del
+// turno por esto.
+async function attachMerchSaleIfValid(merchSaleId: string, appointmentId: string) {
+  await prisma.sale.updateMany({
+    where: { id: merchSaleId, channel: 'MERCH', appointmentId: null },
+    data: { appointmentId },
+  });
+}
+
 export async function createAppointment(input: CreateAppointmentInput) {
   await getBarbero(input.barberoId);
 
@@ -275,6 +279,10 @@ export async function createAppointment(input: CreateAppointmentInput) {
 
   if (!appointment) {
     throw new ConflictError('No se pudo crear el turno');
+  }
+
+  if (input.merchSaleId) {
+    await attachMerchSaleIfValid(input.merchSaleId, appointment.id);
   }
 
   await NotificationService.sendAppointmentConfirmation(appointment);

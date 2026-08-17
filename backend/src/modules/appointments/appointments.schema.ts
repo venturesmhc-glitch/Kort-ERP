@@ -21,6 +21,9 @@ export const createAppointmentSchema = z.object({
   tipoCorteId: z.string().uuid('Tipo de corte invalido'),
   date: z.string().regex(dateRegex, 'Fecha invalida (YYYY-MM-DD)'),
   time: z.string().regex(timeRegex, 'Horario invalido (HH:mm)'),
+  // Vinculo opcional con un pedido de merch ya confirmado desde el flujo "ver
+  // mercancia" del wizard (ver merch.service.ts / StorePage.tsx).
+  merchSaleId: z.string().uuid('Pedido invalido').optional(),
 });
 
 export const updateAppointmentStatusSchema = z.object({

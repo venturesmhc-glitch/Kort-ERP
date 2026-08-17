@@ -4,18 +4,11 @@ import { listPublicArticulosRequest } from '../articulos/articulos.api';
 import type { Articulo } from '../articulos/articulos.types';
 import { listPublicCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
-import type { CartItem } from './store.types';
+import { checkoutMerchRequest, type MerchClienteInput } from './merch.api';
+import { savePendingMerchSaleId, type CartItem } from './store.types';
 import { formatCurrency } from '../../lib/format';
 
-// Gancho pendiente: la Tienda de merchandising (etapa 11) todavia no tiene su
-// propio endpoint de checkout publico. El backend real de Ventas (channel
-// POS) que ya existe es exclusivo de Encargado/Dev desde el panel, no sirve
-// para este flujo anonimo - cuando se implemente la etapa 11, esto va a crear
-// un Sale con channel MERCH sin sellerId. No-op por ahora.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function reservarStockRequest(_articuloId: string, _cantidad: number): Promise<void> {
-  return undefined;
-}
+const EMPTY_CLIENTE: MerchClienteInput = { nombre: '', apellido: '', telefono: '', email: '' };
 
 export function StorePage() {
   const [searchParams] = useSearchParams();
@@ -25,6 +18,7 @@ export function StorePage() {
   const [tipos, setTipos] = useState<CatalogItem[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [cliente, setCliente] = useState<MerchClienteInput>(EMPTY_CLIENTE);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [confirmado, setConfirmado] = useState(false);
@@ -89,11 +83,16 @@ export function StorePage() {
   const total = cart.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
 
   async function handleConfirmarReserva() {
+    if (!cliente.nombre || !cliente.apellido || !cliente.telefono) {
+      setError('Completa tus datos para confirmar la reserva');
+      return;
+    }
     setError(null);
     setConfirming(true);
     try {
-      for (const item of cart) {
-        await reservarStockRequest(item.articuloId, item.cantidad);
+      const { saleId } = await checkoutMerchRequest(cart, cliente);
+      if (vieneDeTurno) {
+        savePendingMerchSaleId(saleId);
       }
       setCart([]);
       setConfirmado(true);
@@ -198,6 +197,29 @@ export function StorePage() {
             )}
 
             <p className="cart-total">Total: {formatCurrency(total)}</p>
+
+            {cart.length > 0 && (
+              <div className="client-form">
+                <label htmlFor="merchNombre">Nombre</label>
+                <input
+                  id="merchNombre"
+                  value={cliente.nombre}
+                  onChange={(e) => setCliente((prev) => ({ ...prev, nombre: e.target.value }))}
+                />
+                <label htmlFor="merchApellido">Apellido</label>
+                <input
+                  id="merchApellido"
+                  value={cliente.apellido}
+                  onChange={(e) => setCliente((prev) => ({ ...prev, apellido: e.target.value }))}
+                />
+                <label htmlFor="merchTelefono">Telefono</label>
+                <input
+                  id="merchTelefono"
+                  value={cliente.telefono}
+                  onChange={(e) => setCliente((prev) => ({ ...prev, telefono: e.target.value }))}
+                />
+              </div>
+            )}
 
             {error && <p className="form-error">{error}</p>}
 
