@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { movimientoFormSchema, type MovimientoFormValues } from './articulos.schema';
 import type { Articulo } from './articulos.types';
+import { useToast } from '../../components/toast/ToastProvider';
+import { ApiError } from '../../lib/apiClient';
+import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 
 interface StockMovementFormProps {
   articulo: Articulo;
@@ -9,25 +12,26 @@ interface StockMovementFormProps {
 }
 
 export function StockMovementForm({ articulo, onSubmit, onCancel }: StockMovementFormProps) {
+  const toast = useToast();
   const [values, setValues] = useState<MovimientoFormValues>({
     tipo: 'ingreso',
     cantidad: 1,
     motivo: '',
   });
-  const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setError(null);
+    setIssues(undefined);
 
     const parsed = movimientoFormSchema.safeParse(values);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos invalidos');
+      setIssues(parsed.error.issues);
       return;
     }
     if (parsed.data.tipo === 'egreso' && parsed.data.cantidad > articulo.stock) {
-      setError(`Stock insuficiente (disponible: ${articulo.stock})`);
+      setIssues([{ path: ['cantidad'], message: `Stock insuficiente (disponible: ${articulo.stock})` }]);
       return;
     }
 
@@ -35,7 +39,10 @@ export function StockMovementForm({ articulo, onSubmit, onCancel }: StockMovemen
     try {
       await onSubmit(parsed.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo registrar el movimiento');
+      if (err instanceof ApiError && err.issues) {
+        setIssues(err.issues);
+      }
+      toast.error(getErrorMessage(err, 'No se pudo registrar el movimiento'));
     } finally {
       setSaving(false);
     }
@@ -66,6 +73,7 @@ export function StockMovementForm({ articulo, onSubmit, onCancel }: StockMovemen
         value={values.cantidad}
         onChange={(e) => setValues((prev) => ({ ...prev, cantidad: Number(e.target.value) }))}
       />
+      {getFieldError(issues, 'cantidad') && <p className="form-error">{getFieldError(issues, 'cantidad')}</p>}
 
       <label htmlFor="motivo">Motivo (opcional)</label>
       <input
@@ -73,8 +81,7 @@ export function StockMovementForm({ articulo, onSubmit, onCancel }: StockMovemen
         value={values.motivo ?? ''}
         onChange={(e) => setValues((prev) => ({ ...prev, motivo: e.target.value }))}
       />
-
-      {error && <p className="form-error">{error}</p>}
+      {getFieldError(issues, 'motivo') && <p className="form-error">{getFieldError(issues, 'motivo')}</p>}
 
       <div className="client-form-actions">
         <button type="button" onClick={onCancel} disabled={saving}>

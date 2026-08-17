@@ -9,8 +9,10 @@ import { UserForm } from './UserForm';
 import type { AppUser } from './users.types';
 import type { UserFormValues } from './users.schema';
 import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { useToast } from '../../components/toast/ToastProvider';
 
 export function UsersPage() {
+  const toast = useToast();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,8 +51,12 @@ export function UsersPage() {
   async function handleDelete(id: string) {
     if (!confirm('¿Desactivar este usuario? No va a poder iniciar sesión ni aparecer como barbero disponible.'))
       return;
-    await deleteUserRequest(id);
-    await loadUsers();
+    try {
+      await deleteUserRequest(id);
+      await loadUsers();
+    } catch (err) {
+      toast.error(toErrorMessage(err, 'No se pudo desactivar el usuario.'));
+    }
   }
 
   return (

@@ -2,6 +2,9 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { DIAS_SEMANA, DIA_LABELS, type DiaSemana, type HorarioInput } from './turnos.types';
 import { listBarberosRequest } from '../users/users.api';
 import type { AppUser } from '../users/users.types';
+import { useToast } from '../../components/toast/ToastProvider';
+import { ApiError } from '../../lib/apiClient';
+import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 
 interface HorarioFormProps {
   initialValues?: HorarioInput;
@@ -10,6 +13,7 @@ interface HorarioFormProps {
 }
 
 export function HorarioForm({ initialValues, onSubmit, onCancel }: HorarioFormProps) {
+  const toast = useToast();
   const [barberos, setBarberos] = useState<AppUser[]>([]);
   const [values, setValues] = useState<HorarioInput>(
     initialValues ?? {
@@ -20,7 +24,7 @@ export function HorarioForm({ initialValues, onSubmit, onCancel }: HorarioFormPr
       horaFin: '18:00',
     }
   );
-  const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -39,14 +43,14 @@ export function HorarioForm({ initialValues, onSubmit, onCancel }: HorarioFormPr
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setError(null);
+    setIssues(undefined);
 
     if (!values.barberoId) {
-      setError('Selecciona un barbero');
+      setIssues([{ path: ['barberoId'], message: 'Selecciona un barbero' }]);
       return;
     }
     if (values.horaInicio >= values.horaFin) {
-      setError('La hora de inicio debe ser anterior a la hora de fin');
+      setIssues([{ path: ['horaFin'], message: 'La hora de inicio debe ser anterior a la hora de fin' }]);
       return;
     }
 
@@ -54,7 +58,10 @@ export function HorarioForm({ initialValues, onSubmit, onCancel }: HorarioFormPr
     try {
       await onSubmit(values);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el horario');
+      if (err instanceof ApiError && err.issues) {
+        setIssues(err.issues);
+      }
+      toast.error(getErrorMessage(err, 'No se pudo guardar el horario'));
     } finally {
       setSaving(false);
     }
@@ -82,6 +89,9 @@ export function HorarioForm({ initialValues, onSubmit, onCancel }: HorarioFormPr
           </option>
         ))}
       </select>
+      {getFieldError(issues, 'barberoId') && (
+        <p className="form-error">{getFieldError(issues, 'barberoId')}</p>
+      )}
 
       <label htmlFor="dia">Dia</label>
       <select
@@ -111,8 +121,7 @@ export function HorarioForm({ initialValues, onSubmit, onCancel }: HorarioFormPr
         value={values.horaFin}
         onChange={(e) => setValues((prev) => ({ ...prev, horaFin: e.target.value }))}
       />
-
-      {error && <p className="form-error">{error}</p>}
+      {getFieldError(issues, 'horaFin') && <p className="form-error">{getFieldError(issues, 'horaFin')}</p>}
 
       <div className="client-form-actions">
         <button type="button" onClick={onCancel} disabled={saving}>

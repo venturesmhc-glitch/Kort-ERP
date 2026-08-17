@@ -4,6 +4,9 @@ import { MOVIMIENTO_TIPO_LABELS, type MovimientoTipoUI } from './tesoreria.types
 import { listActiveCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
 import { todayIso } from '../../lib/format';
+import { useToast } from '../../components/toast/ToastProvider';
+import { ApiError } from '../../lib/apiClient';
+import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 
 interface MovimientoFormProps {
   onSubmit: (values: MovimientoFormValues) => Promise<void>;
@@ -26,9 +29,10 @@ function catalogKeyForTipo(tipo: MovimientoTipoUI) {
 }
 
 export function MovimientoForm({ onSubmit, onCancel }: MovimientoFormProps) {
+  const toast = useToast();
   const [values, setValues] = useState<MovimientoFormValues>(EMPTY_VALUES);
   const [categorias, setCategorias] = useState<CatalogItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -45,11 +49,11 @@ export function MovimientoForm({ onSubmit, onCancel }: MovimientoFormProps) {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setError(null);
+    setIssues(undefined);
 
     const parsed = movimientoFormSchema.safeParse(values);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos invalidos');
+      setIssues(parsed.error.issues);
       return;
     }
 
@@ -57,7 +61,10 @@ export function MovimientoForm({ onSubmit, onCancel }: MovimientoFormProps) {
     try {
       await onSubmit(parsed.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el movimiento');
+      if (err instanceof ApiError && err.issues) {
+        setIssues(err.issues);
+      }
+      toast.error(getErrorMessage(err, 'No se pudo guardar el movimiento'));
     } finally {
       setSaving(false);
     }
@@ -98,6 +105,9 @@ export function MovimientoForm({ onSubmit, onCancel }: MovimientoFormProps) {
           </option>
         ))}
       </select>
+      {getFieldError(issues, 'categoriaId') && (
+        <p className="form-error">{getFieldError(issues, 'categoriaId')}</p>
+      )}
 
       <label htmlFor="monto">Monto</label>
       <input
@@ -108,6 +118,7 @@ export function MovimientoForm({ onSubmit, onCancel }: MovimientoFormProps) {
         value={values.monto}
         onChange={(e) => setValues((prev) => ({ ...prev, monto: Number(e.target.value) }))}
       />
+      {getFieldError(issues, 'monto') && <p className="form-error">{getFieldError(issues, 'monto')}</p>}
 
       <label htmlFor="fecha">Fecha</label>
       <input
@@ -116,6 +127,7 @@ export function MovimientoForm({ onSubmit, onCancel }: MovimientoFormProps) {
         value={values.fecha}
         onChange={(e) => setValues((prev) => ({ ...prev, fecha: e.target.value }))}
       />
+      {getFieldError(issues, 'fecha') && <p className="form-error">{getFieldError(issues, 'fecha')}</p>}
 
       <label htmlFor="descripcion">Descripcion (opcional)</label>
       <input
@@ -123,8 +135,9 @@ export function MovimientoForm({ onSubmit, onCancel }: MovimientoFormProps) {
         value={values.descripcion}
         onChange={(e) => setValues((prev) => ({ ...prev, descripcion: e.target.value }))}
       />
-
-      {error && <p className="form-error">{error}</p>}
+      {getFieldError(issues, 'descripcion') && (
+        <p className="form-error">{getFieldError(issues, 'descripcion')}</p>
+      )}
 
       <div className="client-form-actions">
         <button type="button" onClick={onCancel} disabled={saving}>

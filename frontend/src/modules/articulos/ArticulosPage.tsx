@@ -13,8 +13,10 @@ import type { Articulo } from './articulos.types';
 import type { ArticuloFormValues, MovimientoFormValues } from './articulos.schema';
 import { formatCurrency } from '../../lib/format';
 import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { useToast } from '../../components/toast/ToastProvider';
 
 export function ArticulosPage() {
+  const toast = useToast();
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,8 +61,12 @@ export function ArticulosPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este articulo?')) return;
-    await deleteArticuloRequest(id);
-    await loadArticulos();
+    try {
+      await deleteArticuloRequest(id);
+      await loadArticulos();
+    } catch (err) {
+      toast.error(toErrorMessage(err, 'No se pudo eliminar el articulo.'));
+    }
   }
 
   async function handleMovement(values: MovimientoFormValues) {

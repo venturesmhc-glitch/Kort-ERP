@@ -13,6 +13,7 @@ import type { MovimientoFormValues } from './tesoreria.schema';
 import { BarChart } from '../../components/BarChart';
 import { formatCurrency, formatDate, todayIso, toLocalIso } from '../../lib/format';
 import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { useToast } from '../../components/toast/ToastProvider';
 
 function inicioDeMes() {
   const now = new Date();
@@ -20,6 +21,7 @@ function inicioDeMes() {
 }
 
 export function TesoreriaPage() {
+  const toast = useToast();
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [resumen, setResumen] = useState<TreasurySummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,8 +62,12 @@ export function TesoreriaPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este movimiento?')) return;
-    await deleteMovimientoRequest(id);
-    await loadAll(filtros);
+    try {
+      await deleteMovimientoRequest(id);
+      await loadAll(filtros);
+    } catch (err) {
+      toast.error(toErrorMessage(err, 'No se pudo eliminar el movimiento.'));
+    }
   }
 
   function handleFiltrar() {

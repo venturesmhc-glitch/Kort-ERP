@@ -28,8 +28,20 @@ const EXTENSION_BY_MIME: Record<string, string> = {
   'image/gif': '.gif',
 };
 
-function extensionFor(mimeType: string, originalName: string): string {
-  return path.extname(originalName) || EXTENSION_BY_MIME[mimeType] || '';
+// Whitelist de mimetypes de imagen aceptados para upload. Deliberadamente sin
+// image/svg+xml: un SVG es XML y puede llevar <script> embebido, asi que
+// servirlo tal cual desde /uploads (estatico) es un vector de XSS almacenado.
+export const ALLOWED_IMAGE_MIME_TYPES = Object.keys(EXTENSION_BY_MIME);
+
+// La extension sale siempre del mimetype, nunca del nombre original del
+// archivo (controlado por el cliente): si se tomara de ahi, un archivo con
+// mimetype image/* pero nombre "x.svg"/"x.html" quedaria guardado y servido
+// con esa extension via /uploads, habilitando XSS almacenado. Un mimetype
+// fuera del whitelist no deberia llegar aca (ver fileFilter en
+// articles.routes.ts), pero si pasa devolvemos '' antes que confiar en el
+// nombre del cliente.
+function extensionFor(mimeType: string): string {
+  return EXTENSION_BY_MIME[mimeType] ?? '';
 }
 
 class LocalDiskStorageService implements StorageService {
@@ -38,7 +50,7 @@ class LocalDiskStorageService implements StorageService {
       await mkdir(UPLOAD_DIR, { recursive: true });
     }
 
-    const key = `${randomUUID()}${extensionFor(file.mimeType, file.originalName)}`;
+    const key = `${randomUUID()}${extensionFor(file.mimeType)}`;
     await writeFile(path.join(UPLOAD_DIR, key), file.buffer);
 
     return { key, url: this.getImageUrl(key) };

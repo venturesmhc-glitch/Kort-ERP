@@ -1,5 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { catalogItemFormSchema, type CatalogItemFormValues } from './catalogs.schema';
+import { useToast } from '../../components/toast/ToastProvider';
+import { ApiError } from '../../lib/apiClient';
+import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 
 interface CatalogItemFormProps {
   initialValues?: CatalogItemFormValues;
@@ -16,17 +19,18 @@ export function CatalogItemForm({
   onCancel,
   showPrecio = false,
 }: CatalogItemFormProps) {
+  const toast = useToast();
   const [values, setValues] = useState<CatalogItemFormValues>(initialValues);
-  const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setError(null);
+    setIssues(undefined);
 
     const parsed = catalogItemFormSchema.safeParse(values);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos invalidos');
+      setIssues(parsed.error.issues);
       return;
     }
 
@@ -34,7 +38,10 @@ export function CatalogItemForm({
     try {
       await onSubmit(parsed.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el registro');
+      if (err instanceof ApiError && err.issues) {
+        setIssues(err.issues);
+      }
+      toast.error(getErrorMessage(err, 'No se pudo guardar el registro'));
     } finally {
       setSaving(false);
     }
@@ -48,6 +55,7 @@ export function CatalogItemForm({
         value={values.nombre}
         onChange={(e) => setValues((prev) => ({ ...prev, nombre: e.target.value }))}
       />
+      {getFieldError(issues, 'nombre') && <p className="form-error">{getFieldError(issues, 'nombre')}</p>}
 
       <label htmlFor="descripcion">Descripcion (opcional)</label>
       <input
@@ -55,6 +63,9 @@ export function CatalogItemForm({
         value={values.descripcion}
         onChange={(e) => setValues((prev) => ({ ...prev, descripcion: e.target.value }))}
       />
+      {getFieldError(issues, 'descripcion') && (
+        <p className="form-error">{getFieldError(issues, 'descripcion')}</p>
+      )}
 
       {showPrecio && (
         <>
@@ -70,6 +81,7 @@ export function CatalogItemForm({
               setValues((prev) => ({ ...prev, precio: raw === '' ? undefined : Number(raw) }));
             }}
           />
+          {getFieldError(issues, 'precio') && <p className="form-error">{getFieldError(issues, 'precio')}</p>}
         </>
       )}
 
@@ -81,8 +93,6 @@ export function CatalogItemForm({
         />
         Activo
       </label>
-
-      {error && <p className="form-error">{error}</p>}
 
       <div className="client-form-actions">
         <button type="button" onClick={onCancel} disabled={saving}>

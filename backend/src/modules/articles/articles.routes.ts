@@ -4,6 +4,7 @@ import { verifyToken } from '../../middleware/auth.js';
 import { authorize } from '../../middleware/authorize.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { AppError } from '../../utils/errors.js';
+import { ALLOWED_IMAGE_MIME_TYPES } from '../../lib/storage/storageService.js';
 import {
   createArticleHandler,
   createMovementHandler,
@@ -20,8 +21,8 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) {
-      cb(new AppError('El archivo debe ser una imagen'));
+    if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
+      cb(new AppError('El archivo debe ser una imagen (jpeg, png, webp o gif)'));
       return;
     }
     cb(null, true);

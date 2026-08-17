@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { verifyToken } from '../../middleware/auth.js';
 import { authorize } from '../../middleware/authorize.js';
+import { publicWriteLimiter } from '../../middleware/rateLimit.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import {
   createAppointmentHandler,
@@ -52,4 +53,4 @@ appointmentsRouter.put(
 // Lectura de disponibilidad y creacion de turno, sin autenticacion (landing).
 export const publicAppointmentsRouter = Router();
 publicAppointmentsRouter.get('/availability', asyncHandler(getAvailabilityHandler));
-publicAppointmentsRouter.post('/', asyncHandler(createAppointmentHandler));
+publicAppointmentsRouter.post('/', publicWriteLimiter, asyncHandler(createAppointmentHandler));

@@ -1,5 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { clientFormSchema, type ClientFormValues } from './clients.schema';
+import { useToast } from '../../components/toast/ToastProvider';
+import { ApiError } from '../../lib/apiClient';
+import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 
 interface ClientFormProps {
   initialValues?: ClientFormValues;
@@ -10,17 +13,18 @@ interface ClientFormProps {
 const EMPTY_VALUES: ClientFormValues = { firstName: '', lastName: '', phone: '' };
 
 export function ClientForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel }: ClientFormProps) {
+  const toast = useToast();
   const [values, setValues] = useState<ClientFormValues>(initialValues);
-  const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setError(null);
+    setIssues(undefined);
 
     const parsed = clientFormSchema.safeParse(values);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos invalidos');
+      setIssues(parsed.error.issues);
       return;
     }
 
@@ -28,7 +32,10 @@ export function ClientForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel }:
     try {
       await onSubmit(parsed.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el cliente');
+      if (err instanceof ApiError && err.issues) {
+        setIssues(err.issues);
+      }
+      toast.error(getErrorMessage(err, 'No se pudo guardar el cliente'));
     } finally {
       setSaving(false);
     }
@@ -42,6 +49,9 @@ export function ClientForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel }:
         value={values.firstName}
         onChange={(e) => setValues((prev) => ({ ...prev, firstName: e.target.value }))}
       />
+      {getFieldError(issues, 'firstName') && (
+        <p className="form-error">{getFieldError(issues, 'firstName')}</p>
+      )}
 
       <label htmlFor="lastName">Apellido</label>
       <input
@@ -49,6 +59,9 @@ export function ClientForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel }:
         value={values.lastName}
         onChange={(e) => setValues((prev) => ({ ...prev, lastName: e.target.value }))}
       />
+      {getFieldError(issues, 'lastName') && (
+        <p className="form-error">{getFieldError(issues, 'lastName')}</p>
+      )}
 
       <label htmlFor="phone">Telefono</label>
       <input
@@ -56,8 +69,7 @@ export function ClientForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel }:
         value={values.phone}
         onChange={(e) => setValues((prev) => ({ ...prev, phone: e.target.value }))}
       />
-
-      {error && <p className="form-error">{error}</p>}
+      {getFieldError(issues, 'phone') && <p className="form-error">{getFieldError(issues, 'phone')}</p>}
 
       <div className="client-form-actions">
         <button type="button" onClick={onCancel} disabled={saving}>

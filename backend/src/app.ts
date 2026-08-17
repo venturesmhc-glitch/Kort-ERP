@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'node:path';
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -21,6 +22,10 @@ import { merchRouter, publicMerchRouter } from './modules/merch/merch.routes.js'
 
 export const app = express();
 
+// crossOriginResourcePolicy en 'cross-origin': el frontend (otro origen) carga
+// las imagenes de /uploads en <img>, el default 'same-origin' de helmet las
+// bloquearia.
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: env.corsOrigin }));
 app.use(express.json());
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));

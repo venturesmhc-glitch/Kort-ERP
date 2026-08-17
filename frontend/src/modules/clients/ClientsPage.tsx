@@ -9,8 +9,13 @@ import { ClientForm } from './ClientForm';
 import type { Client } from './clients.types';
 import type { ClientFormValues } from './clients.schema';
 import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { useToast } from '../../components/toast/ToastProvider';
+import { useAuth } from '../auth/AuthContext';
 
 export function ClientsPage() {
+  const toast = useToast();
+  const { user } = useAuth();
+  const canDelete = user?.role === 'DEV' || user?.role === 'ENCARGADO';
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,8 +54,12 @@ export function ClientsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este cliente?')) return;
-    await deleteClientRequest(id);
-    await loadClients();
+    try {
+      await deleteClientRequest(id);
+      await loadClients();
+    } catch (err) {
+      toast.error(toErrorMessage(err, 'No se pudo eliminar el cliente.'));
+    }
   }
 
   return (
@@ -104,9 +113,11 @@ export function ClientsPage() {
                   <button type="button" onClick={() => setEditingClient(client)}>
                     Editar
                   </button>
-                  <button type="button" onClick={() => handleDelete(client.id)}>
-                    Eliminar
-                  </button>
+                  {canDelete && (
+                    <button type="button" onClick={() => handleDelete(client.id)}>
+                      Eliminar
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

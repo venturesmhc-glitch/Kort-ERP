@@ -13,6 +13,7 @@ import { listPublicArticulosRequest } from '../articulos/articulos.api';
 import type { Articulo } from '../articulos/articulos.types';
 import { formatCurrency, formatDate, toLocalIso } from '../../lib/format';
 import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { useToast } from '../../components/toast/ToastProvider';
 
 function fechaHora(iso: string) {
   return `${formatDate(toLocalIso(new Date(iso)))} ${new Date(iso).toLocaleTimeString('es-AR', {
@@ -22,6 +23,7 @@ function fechaHora(iso: string) {
 }
 
 export function VentasPage() {
+  const toast = useToast();
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,16 +69,24 @@ export function VentasPage() {
   }
 
   async function handleEntregarMerch(id: string) {
-    const pedido = await marcarMerchEntregadoRequest(id);
-    loadPedidosMerch();
-    await loadVentas(filtros);
-    if (pedido.treasuryWarning) alert(pedido.treasuryWarning);
+    try {
+      const pedido = await marcarMerchEntregadoRequest(id);
+      loadPedidosMerch();
+      await loadVentas(filtros);
+      if (pedido.treasuryWarning) alert(pedido.treasuryWarning);
+    } catch (err) {
+      toast.error(toErrorMessage(err, 'No se pudo entregar el pedido.'));
+    }
   }
 
   async function handleCancelarMerch(id: string) {
     if (!confirm('¿Cancelar este pedido? El stock reservado se devuelve.')) return;
-    await cancelarMerchPedidoRequest(id);
-    loadPedidosMerch();
+    try {
+      await cancelarMerchPedidoRequest(id);
+      loadPedidosMerch();
+    } catch (err) {
+      toast.error(toErrorMessage(err, 'No se pudo cancelar el pedido.'));
+    }
   }
 
   function handleFiltrar() {

@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma.js';
 import type { Role, WorkSession } from '@prisma/client';
+import { UnauthorizedError } from '../../utils/errors.js';
 import type { WorkedHoursQuery } from './workshifts.schema.js';
 
 const INACTIVITY_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hs sin actividad, ver skills.md #4
@@ -67,27 +68,31 @@ export async function closeSession(userId: string, reason: 'MANUAL' | 'TIMEOUT' 
   });
 }
 
-// Middleware de actividad (ver middleware/auth.ts): mantiene lastActivityAt al
-// dia mientras el usuario sigue usando el sistema. Si encuentra la sesion ya
-// vencida (>2 hs sin actividad, ej. token todavia valido pero el usuario dejo
-// de usar el sistema) la cierra por TIMEOUT y abre una nueva, en vez de
-// revivir una jornada que ya deberia haber terminado. No se llama con await
-// desde el middleware para no sumar latencia a cada request.
-export async function touchActivity(userId: string) {
+// Middleware de actividad (ver middleware/auth.ts): se llama (con await) en
+// cada request autenticado de Barbero/Encargado, antes de dejarlo pasar. Ata
+// la validez real del JWT a tener un WorkSession abierto y no vencido -
+// ademas de alimentar Jornadas laborales, esto es lo que hace cumplir la
+// regla de skills.md #4 ("pasan 2 horas sin actividad, se cierra la sesion
+// automaticamente") a nivel de autenticacion, no solo de reporte de horas.
+// Si no hay sesion abierta (nunca hubo login, o ya se cerro por logout/
+// inactividad) el request se rechaza y hay que loguearse de nuevo - no se
+// revive una jornada vieja silenciosamente.
+export async function assertSessionActive(userId: string) {
   const openSession = await prisma.workSession.findFirst({
     where: { userId, logoutAt: null },
     orderBy: { loginAt: 'desc' },
   });
-  if (!openSession) return;
 
   const now = new Date();
-  if (isSessionStale(openSession, now)) {
-    await prisma.workSession.update({
-      where: { id: openSession.id },
-      data: { logoutAt: openSession.lastActivityAt, closeReason: 'TIMEOUT' },
-    });
-    await createSession(userId);
-    return;
+
+  if (!openSession || isSessionStale(openSession, now)) {
+    if (openSession) {
+      await prisma.workSession.update({
+        where: { id: openSession.id },
+        data: { logoutAt: openSession.lastActivityAt, closeReason: 'TIMEOUT' },
+      });
+    }
+    throw new UnauthorizedError('Sesion cerrada por inactividad, inicia sesion de nuevo');
   }
 
   if (now.getTime() - openSession.lastActivityAt.getTime() < ACTIVITY_THROTTLE_MS) {
@@ -101,7 +106,7 @@ export const WorkSessionService = {
   createSession,
   closeStaleSessionsIfAny,
   closeSession,
-  touchActivity,
+  assertSessionActive,
 };
 
 interface WorkedHoursRow {

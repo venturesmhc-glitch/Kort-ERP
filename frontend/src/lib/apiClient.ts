@@ -13,13 +13,22 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+// Forma de un issue de validacion Zod tal como lo manda errorHandler.ts del backend
+// (res.status(400).json({ message, issues: err.issues })).
+export interface ApiFieldIssue {
+  path: (string | number)[];
+  message: string;
+}
+
 export class ApiError extends Error {
   status: number;
+  issues?: ApiFieldIssue[];
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, issues?: ApiFieldIssue[]) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.issues = issues;
   }
 }
 
@@ -53,7 +62,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const data = await response.json().catch(() => undefined);
 
   if (!response.ok) {
-    throw new ApiError(data?.message ?? 'Error de red', response.status);
+    throw new ApiError(data?.message ?? 'Error de red', response.status, data?.issues);
   }
 
   return data as T;
@@ -77,7 +86,7 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
   const data = await response.json().catch(() => undefined);
 
   if (!response.ok) {
-    throw new ApiError(data?.message ?? 'Error de red', response.status);
+    throw new ApiError(data?.message ?? 'Error de red', response.status, data?.issues);
   }
 
   return data as T;

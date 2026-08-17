@@ -8,10 +8,12 @@ import { checkoutMerchRequest, type MerchClienteInput } from './merch.api';
 import { savePendingMerchSaleId, type CartItem } from './store.types';
 import { formatCurrency } from '../../lib/format';
 import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { useToast } from '../../components/toast/ToastProvider';
 
 const EMPTY_CLIENTE: MerchClienteInput = { nombre: '', apellido: '', telefono: '', email: '' };
 
 export function StorePage() {
+  const toast = useToast();
   const [searchParams] = useSearchParams();
   const vieneDeTurno = searchParams.get('turno') === '1';
 
@@ -103,7 +105,7 @@ export function StorePage() {
       setConfirmado(true);
       await loadArticulos();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo confirmar la reserva');
+      toast.error(toErrorMessage(err, 'No se pudo confirmar la reserva'));
     } finally {
       setConfirming(false);
     }

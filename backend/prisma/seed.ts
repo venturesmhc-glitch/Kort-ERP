@@ -78,7 +78,7 @@ const BARBEROS = [
 ];
 
 async function seedBarberos() {
-  const defaultPassword = await bcrypt.hash('Password123!', 10);
+  const defaultPassword = await bcrypt.hash('Password123!', 12);
 
   for (const barbero of BARBEROS) {
     const user = await prisma.user.upsert({
@@ -108,7 +108,7 @@ async function seedBarberos() {
 async function main() {
   const email = process.env.SEED_ADMIN_EMAIL ?? 'dev@kort.local';
   const password = process.env.SEED_ADMIN_PASSWORD ?? 'Password123!';
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashedPassword = await bcrypt.hash(password, 12);
 
   const devUser = await prisma.user.upsert({
     where: { email },

@@ -50,7 +50,7 @@ export async function createUser(input: CreateUserInput, actingUser: AuthUser) {
     }
   }
 
-  const hashedPassword = await bcrypt.hash(input.password, 10);
+  const hashedPassword = await bcrypt.hash(input.password, 12);
 
   return prisma.user.create({
     data: {
@@ -99,7 +99,7 @@ export async function updateUser(id: string, input: UpdateUserInput, actingUser:
       phone: input.phone || null,
       address: input.address || null,
       active: input.active,
-      password: input.password ? await bcrypt.hash(input.password, 10) : undefined,
+      password: input.password ? await bcrypt.hash(input.password, 12) : undefined,
     },
     select: LIST_SELECT,
   });

@@ -21,10 +21,12 @@ import {
 import { formatDate } from '../../lib/format';
 import { useAuth } from '../auth/AuthContext';
 import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { useToast } from '../../components/toast/ToastProvider';
 
 type Tab = 'agenda' | 'horarios';
 
 export function TurnosPage() {
+  const toast = useToast();
   const { user } = useAuth();
   const canManageSchedules = user?.role === 'DEV' || user?.role === 'ENCARGADO';
 
@@ -62,8 +64,12 @@ export function TurnosPage() {
   }, []);
 
   async function handleEstadoChange(id: string, estado: TurnoEstado) {
-    await updateTurnoEstadoRequest(id, estado);
-    await loadAll();
+    try {
+      await updateTurnoEstadoRequest(id, estado);
+      await loadAll();
+    } catch (err) {
+      toast.error(toErrorMessage(err, 'No se pudo actualizar el estado del turno.'));
+    }
   }
 
   async function handleSlotMinutosSubmit(event: FormEvent) {
@@ -72,6 +78,8 @@ export function TurnosPage() {
     setSavingSlot(true);
     try {
       await updateAppointmentSettingsRequest(slotMinutos);
+    } catch (err) {
+      toast.error(toErrorMessage(err, 'No se pudo guardar la duracion del turno.'));
     } finally {
       setSavingSlot(false);
     }
@@ -92,8 +100,12 @@ export function TurnosPage() {
 
   async function handleDeleteHorario(id: string) {
     if (!confirm('¿Eliminar este horario?')) return;
-    await deleteHorarioRequest(id);
-    await loadAll();
+    try {
+      await deleteHorarioRequest(id);
+      await loadAll();
+    } catch (err) {
+      toast.error(toErrorMessage(err, 'No se pudo eliminar el horario.'));
+    }
   }
 
   return (

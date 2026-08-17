@@ -6,8 +6,10 @@ import type { CorteFormValues } from './cortes.schema';
 import { formatCurrency, formatDate } from '../../lib/format';
 import { useAuth } from '../auth/AuthContext';
 import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { useToast } from '../../components/toast/ToastProvider';
 
 export function CortesPage() {
+  const toast = useToast();
   const { user } = useAuth();
   const canDelete = user?.role === 'DEV' || user?.role === 'ENCARGADO';
   const [cortes, setCortes] = useState<Corte[]>([]);
@@ -41,8 +43,12 @@ export function CortesPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este registro de corte?')) return;
-    await deleteCorteRequest(id);
-    await loadCortes();
+    try {
+      await deleteCorteRequest(id);
+      await loadCortes();
+    } catch (err) {
+      toast.error(toErrorMessage(err, 'No se pudo eliminar el corte.'));
+    }
   }
 
   return (

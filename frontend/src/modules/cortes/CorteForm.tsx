@@ -10,6 +10,9 @@ import { listTurnosRequest } from '../turnos/turnos.api';
 import type { Turno } from '../turnos/turnos.types';
 import { readFileAsDataUrl } from '../../lib/file';
 import { todayIso } from '../../lib/format';
+import { useToast } from '../../components/toast/ToastProvider';
+import { ApiError } from '../../lib/apiClient';
+import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 
 interface CorteFormProps {
   onSubmit: (values: CorteFormValues) => Promise<void>;
@@ -19,6 +22,7 @@ interface CorteFormProps {
 const TODAY = todayIso();
 
 export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
+  const toast = useToast();
   const [clients, setClients] = useState<Client[]>([]);
   const [barberos, setBarberos] = useState<AppUser[]>([]);
   const [tiposCorte, setTiposCorte] = useState<CatalogItem[]>([]);
@@ -36,7 +40,7 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
     imagenUrl: '',
     appointmentId: '',
   });
-  const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -115,11 +119,11 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setError(null);
+    setIssues(undefined);
 
     const parsed = corteFormSchema.safeParse(values);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos invalidos');
+      setIssues(parsed.error.issues);
       return;
     }
 
@@ -127,7 +131,10 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
     try {
       await onSubmit(parsed.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo registrar el corte');
+      if (err instanceof ApiError && err.issues) {
+        setIssues(err.issues);
+      }
+      toast.error(getErrorMessage(err, 'No se pudo registrar el corte'));
     } finally {
       setSaving(false);
     }
@@ -156,6 +163,9 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
           </option>
         ))}
       </select>
+      {getFieldError(issues, 'barberoId') && (
+        <p className="form-error">{getFieldError(issues, 'barberoId')}</p>
+      )}
 
       <label htmlFor="turno">Vincular turno de hoy (opcional)</label>
       <select id="turno" value={values.appointmentId ?? ''} onChange={(e) => handleTurnoChange(e.target.value)}>
@@ -183,6 +193,9 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
         value={values.clienteNombre}
         onChange={(e) => setValues((prev) => ({ ...prev, clienteNombre: e.target.value }))}
       />
+      {getFieldError(issues, 'clienteNombre') && (
+        <p className="form-error">{getFieldError(issues, 'clienteNombre')}</p>
+      )}
 
       <label htmlFor="clienteApellido">Apellido del cliente</label>
       <input
@@ -190,6 +203,9 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
         value={values.clienteApellido}
         onChange={(e) => setValues((prev) => ({ ...prev, clienteApellido: e.target.value }))}
       />
+      {getFieldError(issues, 'clienteApellido') && (
+        <p className="form-error">{getFieldError(issues, 'clienteApellido')}</p>
+      )}
 
       <label htmlFor="clienteTelefono">Telefono del cliente</label>
       <input
@@ -197,6 +213,9 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
         value={values.clienteTelefono}
         onChange={(e) => setValues((prev) => ({ ...prev, clienteTelefono: e.target.value }))}
       />
+      {getFieldError(issues, 'clienteTelefono') && (
+        <p className="form-error">{getFieldError(issues, 'clienteTelefono')}</p>
+      )}
 
       <label htmlFor="tipoCorte">Tipo de corte</label>
       <select
@@ -219,6 +238,9 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
           </option>
         ))}
       </select>
+      {getFieldError(issues, 'tipoCorteId') && (
+        <p className="form-error">{getFieldError(issues, 'tipoCorteId')}</p>
+      )}
 
       <label htmlFor="precio">Precio</label>
       <input
@@ -229,6 +251,7 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
         value={values.precio}
         onChange={(e) => setValues((prev) => ({ ...prev, precio: Number(e.target.value) }))}
       />
+      {getFieldError(issues, 'precio') && <p className="form-error">{getFieldError(issues, 'precio')}</p>}
 
       <label htmlFor="fecha">Fecha</label>
       <input
@@ -237,14 +260,13 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
         value={values.fecha}
         onChange={(e) => setValues((prev) => ({ ...prev, fecha: e.target.value }))}
       />
+      {getFieldError(issues, 'fecha') && <p className="form-error">{getFieldError(issues, 'fecha')}</p>}
 
       <label htmlFor="imagen">Foto del corte (opcional)</label>
       <input id="imagen" type="file" accept="image/*" onChange={handleImageChange} />
       {values.imagenUrl && (
         <img src={values.imagenUrl} alt={values.clienteNombre} className="image-upload-preview" />
       )}
-
-      {error && <p className="form-error">{error}</p>}
 
       <div className="client-form-actions">
         <button type="button" onClick={onCancel} disabled={saving}>

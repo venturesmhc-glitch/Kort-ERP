@@ -11,6 +11,7 @@ import type { Turno } from '../turnos/turnos.types';
 import { clearPendingMerchSaleId, loadPendingMerchSaleId } from '../public-store/store.types';
 import { formatDate, todayIso } from '../../lib/format';
 import { ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { useToast } from '../../components/toast/ToastProvider';
 
 const TODAY = todayIso();
 const STEP_LABELS = ['Tus datos', 'Barbero', 'Horario', 'Tipo de corte', 'Confirmar'];
@@ -18,6 +19,7 @@ const STEP_LABELS = ['Tus datos', 'Barbero', 'Horario', 'Tipo de corte', 'Confir
 const EMPTY_CLIENTE: ClienteStepFormValues = { nombre: '', apellido: '', telefono: '', email: '' };
 
 export function TurnoWizardPage() {
+  const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -129,7 +131,7 @@ export function TurnoWizardPage() {
       setTurnoConfirmado(turno);
       setStep(6);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo confirmar el turno');
+      toast.error(toErrorMessage(err, 'No se pudo confirmar el turno'));
     } finally {
       setConfirming(false);
     }

@@ -11,6 +11,8 @@ import { listClientsRequest } from '../clients/clients.api';
 import type { Client } from '../clients/clients.types';
 import { formatCurrency } from '../../lib/format';
 import type { CrearVentaInput, CrearVentaItemInput } from './ventas.api';
+import { useToast } from '../../components/toast/ToastProvider';
+import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 
 interface CartLine extends CrearVentaItemInput {
   key: string;
@@ -25,6 +27,7 @@ interface VentaFormProps {
 type ClienteModo = 'ninguno' | 'existente' | 'nuevo';
 
 export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
+  const toast = useToast();
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -41,7 +44,8 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
     lastName: '',
     phone: '',
   });
-  const [error, setError] = useState<string | null>(null);
+  const [itemIssues, setItemIssues] = useState<FieldIssue[] | undefined>(undefined);
+  const [clienteIssues, setClienteIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -70,14 +74,14 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
   const disponible = articuloSeleccionado ? articuloSeleccionado.stock - cantidadEnCarrito : 0;
 
   function handleAgregarItem() {
-    setError(null);
+    setItemIssues(undefined);
     const parsed = ventaItemFormSchema.safeParse(itemValues);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos invalidos');
+      setItemIssues(parsed.error.issues);
       return;
     }
     if (parsed.data.cantidad > disponible) {
-      setError(`Stock insuficiente (disponible: ${disponible})`);
+      setItemIssues([{ path: ['cantidad'], message: `Stock insuficiente (disponible: ${disponible})` }]);
       return;
     }
     setCart((prev) => [
@@ -101,10 +105,10 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setError(null);
+    setClienteIssues(undefined);
 
     if (cart.length === 0) {
-      setError('Agrega al menos un articulo al carrito');
+      toast.error('Agrega al menos un articulo al carrito');
       return;
     }
 
@@ -112,13 +116,13 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
     if (clienteModo === 'nuevo') {
       const parsedCliente = clienteVentaFormSchema.safeParse(clienteNuevo);
       if (!parsedCliente.success) {
-        setError(parsedCliente.error.issues[0]?.message ?? 'Datos del cliente invalidos');
+        setClienteIssues(parsedCliente.error.issues);
         return;
       }
       clienteNuevoPayload = parsedCliente.data;
     }
     if (clienteModo === 'existente' && !clienteId) {
-      setError('Selecciona un cliente');
+      toast.error('Selecciona un cliente');
       return;
     }
 
@@ -134,7 +138,7 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
         clienteNuevo: clienteNuevoPayload,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo registrar la venta');
+      toast.error(getErrorMessage(err, 'No se pudo registrar la venta'));
     } finally {
       setSaving(false);
     }
@@ -164,6 +168,9 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
           </option>
         ))}
       </select>
+      {getFieldError(itemIssues, 'articuloId') && (
+        <p className="form-error">{getFieldError(itemIssues, 'articuloId')}</p>
+      )}
 
       <label htmlFor="cantidad">Cantidad</label>
       <input
@@ -174,6 +181,9 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
         value={itemValues.cantidad}
         onChange={(e) => setItemValues((prev) => ({ ...prev, cantidad: Number(e.target.value) }))}
       />
+      {getFieldError(itemIssues, 'cantidad') && (
+        <p className="form-error">{getFieldError(itemIssues, 'cantidad')}</p>
+      )}
 
       <label htmlFor="precioUnitario">Precio unitario</label>
       <input
@@ -184,6 +194,9 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
         value={itemValues.precioUnitario}
         onChange={(e) => setItemValues((prev) => ({ ...prev, precioUnitario: Number(e.target.value) }))}
       />
+      {getFieldError(itemIssues, 'precioUnitario') && (
+        <p className="form-error">{getFieldError(itemIssues, 'precioUnitario')}</p>
+      )}
 
       <button type="button" onClick={handleAgregarItem} disabled={articulos.length === 0}>
         Agregar al carrito
@@ -254,22 +267,29 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
             value={clienteNuevo.firstName}
             onChange={(e) => setClienteNuevo((prev) => ({ ...prev, firstName: e.target.value }))}
           />
+          {getFieldError(clienteIssues, 'firstName') && (
+            <p className="form-error">{getFieldError(clienteIssues, 'firstName')}</p>
+          )}
           <label htmlFor="clienteApellido">Apellido</label>
           <input
             id="clienteApellido"
             value={clienteNuevo.lastName}
             onChange={(e) => setClienteNuevo((prev) => ({ ...prev, lastName: e.target.value }))}
           />
+          {getFieldError(clienteIssues, 'lastName') && (
+            <p className="form-error">{getFieldError(clienteIssues, 'lastName')}</p>
+          )}
           <label htmlFor="clienteTelefono">Telefono</label>
           <input
             id="clienteTelefono"
             value={clienteNuevo.phone}
             onChange={(e) => setClienteNuevo((prev) => ({ ...prev, phone: e.target.value }))}
           />
+          {getFieldError(clienteIssues, 'phone') && (
+            <p className="form-error">{getFieldError(clienteIssues, 'phone')}</p>
+          )}
         </>
       )}
-
-      {error && <p className="form-error">{error}</p>}
 
       <div className="client-form-actions">
         <button type="button" onClick={onCancel} disabled={saving}>

@@ -2,6 +2,9 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { articuloFormSchema, type ArticuloFormValues } from './articulos.schema';
 import { listActiveCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
+import { useToast } from '../../components/toast/ToastProvider';
+import { ApiError } from '../../lib/apiClient';
+import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 
 interface ArticuloFormProps {
   initialValues?: ArticuloFormValues;
@@ -24,12 +27,13 @@ export function ArticuloForm({
   onSubmit,
   onCancel,
 }: ArticuloFormProps) {
+  const toast = useToast();
   const isEditing = initialValues !== EMPTY_VALUES;
   const [values, setValues] = useState<ArticuloFormValues>(initialValues);
   const [tipos, setTipos] = useState<CatalogItem[]>([]);
   const [imagenFile, setImagenFile] = useState<File | null>(null);
   const [imagenPreview, setImagenPreview] = useState<string | undefined>(initialImagenUrl);
-  const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -55,11 +59,11 @@ export function ArticuloForm({
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setError(null);
+    setIssues(undefined);
 
     const parsed = articuloFormSchema.safeParse(values);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos invalidos');
+      setIssues(parsed.error.issues);
       return;
     }
 
@@ -67,7 +71,10 @@ export function ArticuloForm({
     try {
       await onSubmit(parsed.data, imagenFile);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el articulo');
+      if (err instanceof ApiError && err.issues) {
+        setIssues(err.issues);
+      }
+      toast.error(getErrorMessage(err, 'No se pudo guardar el articulo'));
     } finally {
       setSaving(false);
     }
@@ -81,6 +88,7 @@ export function ArticuloForm({
         value={values.nombre}
         onChange={(e) => setValues((prev) => ({ ...prev, nombre: e.target.value }))}
       />
+      {getFieldError(issues, 'nombre') && <p className="form-error">{getFieldError(issues, 'nombre')}</p>}
 
       <label htmlFor="descripcion">Descripcion (opcional)</label>
       <input
@@ -88,6 +96,9 @@ export function ArticuloForm({
         value={values.descripcion ?? ''}
         onChange={(e) => setValues((prev) => ({ ...prev, descripcion: e.target.value }))}
       />
+      {getFieldError(issues, 'descripcion') && (
+        <p className="form-error">{getFieldError(issues, 'descripcion')}</p>
+      )}
 
       <label htmlFor="tipoProducto">Tipo de producto</label>
       <select
@@ -109,6 +120,9 @@ export function ArticuloForm({
           </option>
         ))}
       </select>
+      {getFieldError(issues, 'tipoProductoId') && (
+        <p className="form-error">{getFieldError(issues, 'tipoProductoId')}</p>
+      )}
 
       <label htmlFor="precio">Precio</label>
       <input
@@ -119,6 +133,7 @@ export function ArticuloForm({
         value={values.precio}
         onChange={(e) => setValues((prev) => ({ ...prev, precio: Number(e.target.value) }))}
       />
+      {getFieldError(issues, 'precio') && <p className="form-error">{getFieldError(issues, 'precio')}</p>}
 
       <label htmlFor="umbralStockBajo">Umbral de stock bajo (opcional)</label>
       <input
@@ -132,6 +147,9 @@ export function ArticuloForm({
           setValues((prev) => ({ ...prev, umbralStockBajo: raw === '' ? undefined : Number(raw) }));
         }}
       />
+      {getFieldError(issues, 'umbralStockBajo') && (
+        <p className="form-error">{getFieldError(issues, 'umbralStockBajo')}</p>
+      )}
 
       {!isEditing && (
         <>
@@ -147,14 +165,15 @@ export function ArticuloForm({
               setValues((prev) => ({ ...prev, stockInicial: raw === '' ? undefined : Number(raw) }));
             }}
           />
+          {getFieldError(issues, 'stockInicial') && (
+            <p className="form-error">{getFieldError(issues, 'stockInicial')}</p>
+          )}
         </>
       )}
 
       <label htmlFor="imagen">Imagen (opcional)</label>
       <input id="imagen" type="file" accept="image/*" onChange={handleImageChange} />
       {imagenPreview && <img src={imagenPreview} alt="Vista previa" className="image-upload-preview" />}
-
-      {error && <p className="form-error">{error}</p>}
 
       <div className="client-form-actions">
         <button type="button" onClick={onCancel} disabled={saving}>

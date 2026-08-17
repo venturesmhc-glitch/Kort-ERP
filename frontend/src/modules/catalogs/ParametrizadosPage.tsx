@@ -11,9 +11,10 @@ import {
 import { CatalogItemForm } from './CatalogItemForm';
 import type { CatalogCategory, CatalogItem, CatalogKey } from './catalogs.types';
 import type { CatalogItemFormValues } from './catalogs.schema';
-import { ApiError } from '../../lib/apiClient';
 import { formatCurrency } from '../../lib/format';
 import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { useToast } from '../../components/toast/ToastProvider';
+import { getErrorMessage } from '../../lib/apiErrors';
 
 const ACCENTED_CHARS: Record<string, string> = {
   a: 'aàáâãäå',
@@ -36,6 +37,7 @@ function slugify(value: string) {
 }
 
 export function ParametrizadosPage() {
+  const toast = useToast();
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [activeKey, setActiveKey] = useState<CatalogKey | null>(null);
   const [items, setItems] = useState<CatalogItem[]>([]);
@@ -101,8 +103,12 @@ export function ParametrizadosPage() {
 
   async function handleDelete(id: string) {
     if (!activeKey || !confirm('¿Eliminar este registro del catalogo?')) return;
-    await deleteCatalogItemRequest(activeKey, id);
-    await loadItems(activeKey);
+    try {
+      await deleteCatalogItemRequest(activeKey, id);
+      await loadItems(activeKey);
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'No se pudo eliminar el registro.'));
+    }
   }
 
   async function handleCreateCategory(event: FormEvent) {
@@ -119,7 +125,7 @@ export function ParametrizadosPage() {
       setShowCategoryForm(false);
       await loadCategories(key);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo crear el catalogo');
+      toast.error(getErrorMessage(err, 'No se pudo crear el catalogo'));
     }
   }
 
@@ -130,7 +136,7 @@ export function ParametrizadosPage() {
       await deleteCategoryRequest(activeCategory.key);
       await loadCategories();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo eliminar el catalogo');
+      toast.error(getErrorMessage(err, 'No se pudo eliminar el catalogo'));
     }
   }
 
