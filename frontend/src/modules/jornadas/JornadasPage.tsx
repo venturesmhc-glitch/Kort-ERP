@@ -1,19 +1,41 @@
 import { useEffect, useState } from 'react';
-import { listJornadasRequest } from './jornadas.api';
+import { listJornadasRequest, type ListJornadasFiltros } from './jornadas.api';
 import type { Jornada } from './jornadas.types';
-import { formatDate, horasEntre } from '../../lib/format';
+import { formatDate, todayIso } from '../../lib/format';
+
+function inicioDeMes() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function formatHora(iso: string) {
+  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
 
 export function JornadasPage() {
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filtros, setFiltros] = useState<ListJornadasFiltros>({
+    fechaDesde: inicioDeMes(),
+    fechaHasta: todayIso(),
+  });
+
+  async function load(activeFiltros: ListJornadasFiltros) {
+    setLoading(true);
+    try {
+      const data = await listJornadasRequest(activeFiltros);
+      setJornadas(data);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    listJornadasRequest()
-      .then((data) => setJornadas([...data].sort((a, b) => b.fecha.localeCompare(a.fecha))))
-      .finally(() => setLoading(false));
+    load(filtros);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const totalHoras = jornadas.reduce((sum, j) => sum + horasEntre(j.horaEntrada, j.horaSalida), 0);
+  const totalHoras = jornadas.reduce((sum, j) => sum + j.horasTrabajadas, 0);
   const totalCortes = jornadas.reduce((sum, j) => sum + j.cortesRealizados, 0);
 
   return (
@@ -22,9 +44,29 @@ export function JornadasPage() {
         <h1>Jornadas laborales</h1>
       </div>
       <p className="text-muted">
-        Horas trabajadas por barbero: desde el primer login del dia hasta el ultimo logout. Se
-        cruza con la cantidad de cortes realizados ese dia.
+        Horas trabajadas por barbero: desde el primer login del dia hasta el ultimo logout (o el
+        cierre por inactividad, a las 2 hs). Se cruza con la cantidad de cortes realizados ese dia.
       </p>
+
+      <div className="client-form" style={{ marginBottom: '1rem' }}>
+        <label htmlFor="fechaDesde">Desde</label>
+        <input
+          id="fechaDesde"
+          type="date"
+          value={filtros.fechaDesde ?? ''}
+          onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value || undefined }))}
+        />
+        <label htmlFor="fechaHasta">Hasta</label>
+        <input
+          id="fechaHasta"
+          type="date"
+          value={filtros.fechaHasta ?? ''}
+          onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value || undefined }))}
+        />
+        <button type="button" onClick={() => load(filtros)}>
+          Filtrar
+        </button>
+      </div>
 
       <div className="stat-row">
         <div className="stat-tile">
@@ -54,18 +96,18 @@ export function JornadasPage() {
             </thead>
             <tbody>
               {jornadas.map((jornada) => (
-                <tr key={jornada.id}>
+                <tr key={`${jornada.barberoId}-${jornada.fecha}`}>
                   <td>{formatDate(jornada.fecha)}</td>
                   <td>{jornada.barberoNombre}</td>
-                  <td>{jornada.horaEntrada}</td>
-                  <td>{jornada.horaSalida}</td>
-                  <td>{horasEntre(jornada.horaEntrada, jornada.horaSalida).toFixed(1)} hs</td>
+                  <td>{formatHora(jornada.entrada)}</td>
+                  <td>{jornada.sesionAbierta ? 'En curso' : formatHora(jornada.salida)}</td>
+                  <td>{jornada.horasTrabajadas.toFixed(1)} hs</td>
                   <td>{jornada.cortesRealizados}</td>
                 </tr>
               ))}
               {jornadas.length === 0 && (
                 <tr>
-                  <td colSpan={6}>No hay jornadas registradas todavia.</td>
+                  <td colSpan={6}>No hay jornadas registradas en el periodo.</td>
                 </tr>
               )}
             </tbody>

@@ -3,6 +3,7 @@ import jwt, { type SignOptions } from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { UnauthorizedError } from '../../utils/errors.js';
+import { WorkSessionService } from '../workshifts/workshifts.service.js';
 import type { LoginInput } from './auth.schema.js';
 
 export async function login({ email, password }: LoginInput) {
@@ -21,6 +22,13 @@ export async function login({ email, password }: LoginInput) {
     expiresIn: env.jwtExpiresIn,
   } as SignOptions);
 
+  // Jornadas laborales solo trackea Barbero/Encargado (ver skills.md #4):
+  // Dev es una cuenta tecnica sin horario/dias de trabajo configurados.
+  if (user.role === 'BARBERO' || user.role === 'ENCARGADO') {
+    await WorkSessionService.closeStaleSessionsIfAny(user.id);
+    await WorkSessionService.createSession(user.id);
+  }
+
   return {
     token,
     user: {
@@ -31,4 +39,8 @@ export async function login({ email, password }: LoginInput) {
       role: user.role,
     },
   };
+}
+
+export async function logout(userId: string) {
+  await WorkSessionService.closeSession(userId, 'MANUAL');
 }

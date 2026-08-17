@@ -1,9 +1,10 @@
 export interface Jornada {
-  id: string;
   barberoId: string;
   barberoNombre: string;
   fecha: string;
-  horaEntrada: string;
-  horaSalida: string;
+  entrada: string;
+  salida: string;
+  horasTrabajadas: number;
+  sesionAbierta: boolean;
   cortesRealizados: number;
 }

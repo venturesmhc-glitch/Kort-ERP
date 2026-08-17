@@ -48,6 +48,7 @@ model User {
   appointments  Appointment[]
   cuts          Cut[]
   sales         Sale[]
+  workSessions  WorkSession[]
 
   @@map("users")
 }
@@ -252,6 +253,31 @@ model SaleItem {
   subtotal  Int
 
   @@map("sale_items")
+}
+
+enum WorkSessionCloseReason {
+  MANUAL
+  TIMEOUT
+}
+
+// Modulo Jornadas laborales: registra cada sesion de trabajo (login/logout)
+// de Barbero/Encargado. Como el JWT es stateless, esta tabla es la unica
+// fuente de "quien trabajo y desde cuando". El cierre por inactividad (2 hs,
+// ver skills.md #4) se resuelve de forma perezosa en WorkShiftsService en vez
+// de con un job periodico: no hay proceso nuevo que correr, y toda consulta
+// de horas trabajadas aplica la regla de 2hs en vez de confiar en logoutAt.
+model WorkSession {
+  id             String                  @id @default(uuid())
+  userId         String
+  user           User                    @relation(fields: [userId], references: [id])
+  loginAt        DateTime                @default(now())
+  logoutAt       DateTime?
+  lastActivityAt DateTime                @default(now())
+  closeReason    WorkSessionCloseReason?
+  createdAt      DateTime                @default(now())
+
+  @@index([userId, loginAt])
+  @@map("work_sessions")
 }
 
 enum TreasuryEntryType {

@@ -39,9 +39,3 @@ export function formatDate(iso: string): string {
   if (Number.isNaN(date.getTime())) return iso;
   return dateFormatter.format(date);
 }
-
-export function horasEntre(horaInicio: string, horaFin: string): number {
-  const [hi, mi] = horaInicio.split(':').map(Number);
-  const [hf, mf] = horaFin.split(':').map(Number);
-  return (hf * 60 + mf - (hi * 60 + mi)) / 60;
-}

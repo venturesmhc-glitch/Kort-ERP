@@ -1,12 +1,12 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { clearToken, setToken } from '../../lib/apiClient';
-import { loginRequest } from './auth.api';
+import { loginRequest, logoutRequest } from './auth.api';
 import type { AuthUser } from './auth.types';
 
 interface AuthContextValue {
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -29,7 +29,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(USER_KEY, JSON.stringify(result.user));
         setUser(result.user);
       },
-      logout: () => {
+      logout: async () => {
+        // Best-effort: cierra la WorkSession en el backend (ver Jornadas
+        // laborales), pero la sesion local se limpia igual si falla la red.
+        await logoutRequest().catch(() => undefined);
         clearToken();
         localStorage.removeItem(USER_KEY);
         setUser(null);

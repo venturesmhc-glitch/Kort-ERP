@@ -8,3 +8,7 @@ export function loginRequest(email: string, password: string) {
     auth: false,
   });
 }
+
+export function logoutRequest() {
+  return apiRequest<void>('/auth/logout', { method: 'POST' });
+}
