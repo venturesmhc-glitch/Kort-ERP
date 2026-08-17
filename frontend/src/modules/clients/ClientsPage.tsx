@@ -1,0 +1,116 @@
+import { useEffect, useState } from 'react';
+import {
+  createClientRequest,
+  deleteClientRequest,
+  listClientsRequest,
+  updateClientRequest,
+} from './clients.api';
+import { ClientForm } from './ClientForm';
+import type { Client } from './clients.types';
+import type { ClientFormValues } from './clients.schema';
+
+export function ClientsPage() {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  async function loadClients() {
+    setLoading(true);
+    try {
+      const data = await listClientsRequest();
+      setClients(data);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  async function handleCreate(values: ClientFormValues) {
+    await createClientRequest(values);
+    setShowForm(false);
+    await loadClients();
+  }
+
+  async function handleUpdate(values: ClientFormValues) {
+    if (!editingClient) return;
+    await updateClientRequest(editingClient.id, values);
+    setEditingClient(null);
+    await loadClients();
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('¿Eliminar este cliente?')) return;
+    await deleteClientRequest(id);
+    await loadClients();
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <h1>Clientes</h1>
+        {!showForm && !editingClient && (
+          <button type="button" onClick={() => setShowForm(true)}>
+            Nuevo cliente
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <ClientForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />
+      )}
+
+      {editingClient && (
+        <ClientForm
+          initialValues={{
+            firstName: editingClient.firstName,
+            lastName: editingClient.lastName,
+            phone: editingClient.phone,
+          }}
+          onSubmit={handleUpdate}
+          onCancel={() => setEditingClient(null)}
+        />
+      )}
+
+      {loading ? (
+        <p>Cargando...</p>
+      ) : (
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Apellido</th>
+              <th>Telefono</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {clients.map((client) => (
+              <tr key={client.id}>
+                <td>{client.firstName}</td>
+                <td>{client.lastName}</td>
+                <td>{client.phone}</td>
+                <td className="data-table-actions">
+                  <button type="button" onClick={() => setEditingClient(client)}>
+                    Editar
+                  </button>
+                  <button type="button" onClick={() => handleDelete(client.id)}>
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {clients.length === 0 && (
+              <tr>
+                <td colSpan={4}>No hay clientes cargados todavia.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}

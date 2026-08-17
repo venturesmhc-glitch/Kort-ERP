@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kort-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kort
+      POSTGRES_PASSWORD: kort
+      POSTGRES_DB: kort_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - kort_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  kort_postgres_data:
