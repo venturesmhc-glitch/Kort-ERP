@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { listArticulosRequest } from '../articulos/articulos.api';
+import { listPublicArticulosRequest } from '../articulos/articulos.api';
 import type { Articulo } from '../articulos/articulos.types';
-import { listActiveCatalogItemsRequest } from '../catalogs/catalogs.api';
+import { listPublicCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
 import { crearVentaRequest } from '../ventas/ventas.api';
 import type { CartItem } from './store.types';
@@ -25,8 +25,8 @@ export function StorePage() {
     setLoading(true);
     try {
       const [articulosData, tiposData] = await Promise.all([
-        listArticulosRequest(),
-        listActiveCatalogItemsRequest('tipos-producto'),
+        listPublicArticulosRequest(),
+        listPublicCatalogItemsRequest('tipos-producto'),
       ]);
       setArticulos(articulosData);
       setTipos(tiposData);

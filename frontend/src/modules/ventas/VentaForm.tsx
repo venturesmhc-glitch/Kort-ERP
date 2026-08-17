@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ventaFormSchema, type VentaFormValues } from './ventas.schema';
-import { listArticulosRequest } from '../articulos/articulos.api';
+import { listPublicArticulosRequest } from '../articulos/articulos.api';
 import type { Articulo } from '../articulos/articulos.types';
 import { formatCurrency } from '../../lib/format';
 
@@ -21,7 +21,7 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    listArticulosRequest().then((items) => {
+    listPublicArticulosRequest().then((items) => {
       const disponibles = items.filter((item) => item.stock > 0);
       setArticulos(disponibles);
       const first = disponibles[0];

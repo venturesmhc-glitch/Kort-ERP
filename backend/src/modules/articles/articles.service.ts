@@ -89,9 +89,14 @@ export async function listLowStock() {
 export async function createMovement(articleId: string, input: CreateMovementInput) {
   await getArticle(articleId);
   if (input.type === 'IN') {
-    return StockService.increaseStock(articleId, input.quantity, input.reason);
+    await StockService.increaseStock(articleId, input.quantity, input.reason);
+  } else {
+    await StockService.decreaseStock(articleId, input.quantity, input.reason);
   }
-  return StockService.decreaseStock(articleId, input.quantity, input.reason);
+  // StockService devuelve el Article "pelado" (sin include); volvemos a leerlo
+  // con la relacion tipoProducto para mantener la misma forma que el resto de
+  // los endpoints del modulo.
+  return getArticle(articleId);
 }
 
 export function listMovements(articleId: string) {

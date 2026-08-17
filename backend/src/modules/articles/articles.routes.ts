@@ -44,3 +44,9 @@ articlesRouter.get('/:id/movements', asyncHandler(listMovementsHandler));
 articlesRouter.post('/:id/movements', asyncHandler(createMovementHandler));
 
 articlesRouter.post('/:id/image', upload.single('image'), asyncHandler(uploadArticleImageHandler));
+
+// Lectura publica (sin auth): catalogo de merch para la tienda de la landing y
+// para el registro de ventas del panel admin (accesible a los 3 roles, a
+// diferencia de la gestion de Articulos/Stock que es solo Encargado/Dev).
+export const publicArticlesRouter = Router();
+publicArticlesRouter.get('/', asyncHandler(listArticlesHandler));
