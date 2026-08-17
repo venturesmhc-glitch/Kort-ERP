@@ -57,6 +57,54 @@ async function seedParameterCatalogs() {
   console.log('Catalogos de parametrizados listos.');
 }
 
+const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI'] as const;
+
+const BARBEROS = [
+  {
+    email: 'carlos.gomez@kort.local',
+    firstName: 'Carlos',
+    lastName: 'Gomez',
+    schedule: [
+      ...WEEKDAYS.map((dayOfWeek) => ({ dayOfWeek, startTime: '09:00', endTime: '18:00' })),
+      { dayOfWeek: 'SAT' as const, startTime: '09:00', endTime: '13:00' },
+    ],
+  },
+  {
+    email: 'lucas.fernandez@kort.local',
+    firstName: 'Lucas',
+    lastName: 'Fernandez',
+    schedule: WEEKDAYS.map((dayOfWeek) => ({ dayOfWeek, startTime: '10:00', endTime: '19:00' })),
+  },
+];
+
+async function seedBarberos() {
+  const defaultPassword = await bcrypt.hash('Password123!', 10);
+
+  for (const barbero of BARBEROS) {
+    const user = await prisma.user.upsert({
+      where: { email: barbero.email },
+      update: {},
+      create: {
+        email: barbero.email,
+        password: defaultPassword,
+        firstName: barbero.firstName,
+        lastName: barbero.lastName,
+        role: 'BARBERO',
+      },
+    });
+
+    for (const slot of barbero.schedule) {
+      await prisma.workSchedule.upsert({
+        where: { barberoId_dayOfWeek: { barberoId: user.id, dayOfWeek: slot.dayOfWeek } },
+        update: {},
+        create: { barberoId: user.id, ...slot },
+      });
+    }
+  }
+
+  console.log(`Barberos de ejemplo listos: ${BARBEROS.map((b) => b.email).join(', ')}`);
+}
+
 async function main() {
   const email = process.env.SEED_ADMIN_EMAIL ?? 'dev@kort.local';
   const password = process.env.SEED_ADMIN_PASSWORD ?? 'Password123!';
@@ -77,6 +125,12 @@ async function main() {
   console.log(`Usuario Dev listo: ${devUser.email}`);
 
   await seedParameterCatalogs();
+  await seedBarberos();
+  await prisma.appointmentSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1, slotMinutes: 30 },
+  });
 }
 
 main()

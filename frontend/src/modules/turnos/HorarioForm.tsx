@@ -18,7 +18,6 @@ export function HorarioForm({ initialValues, onSubmit, onCancel }: HorarioFormPr
       dia: 'LUN',
       horaInicio: '09:00',
       horaFin: '18:00',
-      slotMinutos: 30,
     }
   );
   const [error, setError] = useState<string | null>(null);
@@ -111,16 +110,6 @@ export function HorarioForm({ initialValues, onSubmit, onCancel }: HorarioFormPr
         type="time"
         value={values.horaFin}
         onChange={(e) => setValues((prev) => ({ ...prev, horaFin: e.target.value }))}
-      />
-
-      <label htmlFor="slotMinutos">Duracion del turno (minutos)</label>
-      <input
-        id="slotMinutos"
-        type="number"
-        min="10"
-        step="5"
-        value={values.slotMinutos}
-        onChange={(e) => setValues((prev) => ({ ...prev, slotMinutos: Number(e.target.value) }))}
       />
 
       {error && <p className="form-error">{error}</p>}

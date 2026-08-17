@@ -14,7 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/admin/clientes', label: 'Clientes', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
   { to: '/admin/turnos', label: 'Turnos y horarios', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
   { to: '/admin/cortes', label: 'Registro de cortes', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
-  { to: '/admin/articulos', label: 'Articulos y stock', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
+  { to: '/admin/articulos', label: 'Articulos y stock', roles: ['DEV', 'ENCARGADO'] },
   { to: '/admin/ventas', label: 'Ventas', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
   { to: '/admin/tesoreria', label: 'Tesoreria', roles: ['DEV', 'ENCARGADO'] },
   { to: '/admin/parametrizados', label: 'Parametrizados', roles: ['DEV', 'ENCARGADO'] },

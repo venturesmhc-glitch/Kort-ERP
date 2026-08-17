@@ -1,118 +1,198 @@
-import { createMockCollection } from '../../lib/mockStore';
-import type { DiaSemana, Horario, HorarioInput, Turno, TurnoEstado, TurnoInput } from './turnos.types';
+import { apiRequest } from '../../lib/apiClient';
+import type {
+  AppointmentSettings,
+  DiaSemana,
+  Horario,
+  HorarioInput,
+  Turno,
+  TurnoEstado,
+  TurnoInput,
+} from './turnos.types';
 
-const horarioSeed: Horario[] = [
-  {
-    id: 'horario-lucas-lun',
-    barberoId: 'seed-barbero-1',
-    barberoNombre: 'Lucas Ferreyra',
-    dia: 'LUN',
-    horaInicio: '09:00',
-    horaFin: '18:00',
-    slotMinutos: 30,
-  },
-  {
-    id: 'horario-lucas-mar',
-    barberoId: 'seed-barbero-1',
-    barberoNombre: 'Lucas Ferreyra',
-    dia: 'MAR',
-    horaInicio: '09:00',
-    horaFin: '18:00',
-    slotMinutos: 30,
-  },
-  {
-    id: 'horario-lucas-mie',
-    barberoId: 'seed-barbero-1',
-    barberoNombre: 'Lucas Ferreyra',
-    dia: 'MIE',
-    horaInicio: '09:00',
-    horaFin: '18:00',
-    slotMinutos: 30,
-  },
-  {
-    id: 'horario-nahuel-jue',
-    barberoId: 'seed-barbero-2',
-    barberoNombre: 'Nahuel Ibarra',
-    dia: 'JUE',
-    horaInicio: '10:00',
-    horaFin: '19:00',
-    slotMinutos: 30,
-  },
-  {
-    id: 'horario-nahuel-vie',
-    barberoId: 'seed-barbero-2',
-    barberoNombre: 'Nahuel Ibarra',
-    dia: 'VIE',
-    horaInicio: '10:00',
-    horaFin: '19:00',
-    slotMinutos: 30,
-  },
-  {
-    id: 'horario-nahuel-sab',
-    barberoId: 'seed-barbero-2',
-    barberoNombre: 'Nahuel Ibarra',
-    dia: 'SAB',
-    horaInicio: '09:00',
-    horaFin: '14:00',
-    slotMinutos: 30,
-  },
-];
+const DIA_TO_BACKEND: Record<DiaSemana, string> = {
+  LUN: 'MON',
+  MAR: 'TUE',
+  MIE: 'WED',
+  JUE: 'THU',
+  VIE: 'FRI',
+  SAB: 'SAT',
+  DOM: 'SUN',
+};
 
-const turnoSeed: Turno[] = [];
+const DIA_FROM_BACKEND: Record<string, DiaSemana> = {
+  MON: 'LUN',
+  TUE: 'MAR',
+  WED: 'MIE',
+  THU: 'JUE',
+  FRI: 'VIE',
+  SAT: 'SAB',
+  SUN: 'DOM',
+};
 
-const horariosCollection = createMockCollection<Horario>('horarios', horarioSeed);
-const turnosCollection = createMockCollection<Turno>('turnos', turnoSeed);
+const ESTADO_TO_BACKEND: Record<TurnoEstado, string> = {
+  pendiente: 'PENDING',
+  confirmado: 'CONFIRMED',
+  cancelado: 'CANCELLED',
+  completado: 'COMPLETED',
+};
 
-export const listHorariosRequest = () => horariosCollection.list();
-export const createHorarioRequest = (input: HorarioInput) => horariosCollection.create(input);
-export const updateHorarioRequest = (id: string, input: HorarioInput) =>
-  horariosCollection.update(id, input);
-export const deleteHorarioRequest = (id: string) => horariosCollection.remove(id);
+const ESTADO_FROM_BACKEND: Record<string, TurnoEstado> = {
+  PENDING: 'pendiente',
+  CONFIRMED: 'confirmado',
+  CANCELLED: 'cancelado',
+  COMPLETED: 'completado',
+};
 
-export const listTurnosRequest = () => turnosCollection.list();
-export const updateTurnoEstadoRequest = (id: string, estado: TurnoEstado) =>
-  turnosCollection.update(id, { estado });
-export const deleteTurnoRequest = (id: string) => turnosCollection.remove(id);
-
-const DIAS_POR_INDICE: DiaSemana[] = ['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB'];
-
-function diaFromFecha(fecha: string): DiaSemana {
-  const date = new Date(`${fecha}T00:00:00`);
-  return DIAS_POR_INDICE[date.getDay()];
+interface WorkScheduleDto {
+  id: string;
+  barberoId: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  barbero: { id: string; firstName: string; lastName: string };
 }
 
-function generarSlots(horaInicio: string, horaFin: string, slotMinutos: number): string[] {
-  const slots: string[] = [];
-  const [hInicio, mInicio] = horaInicio.split(':').map(Number);
-  const [hFin, mFin] = horaFin.split(':').map(Number);
-  let current = hInicio * 60 + mInicio;
-  const end = hFin * 60 + mFin;
-  while (current < end) {
-    const hh = Math.floor(current / 60).toString().padStart(2, '0');
-    const mm = (current % 60).toString().padStart(2, '0');
-    slots.push(`${hh}:${mm}`);
-    current += slotMinutos;
-  }
-  return slots;
+interface AppointmentDto {
+  id: string;
+  code: string;
+  scheduledAt: string;
+  status: string;
+  client: { firstName: string; lastName: string; phone: string; email: string | null };
+  barberoId: string;
+  barbero: { firstName: string; lastName: string };
+  tipoCorteId: string;
+  tipoCorte: { name: string };
 }
+
+function toHorario(dto: WorkScheduleDto): Horario {
+  return {
+    id: dto.id,
+    barberoId: dto.barberoId,
+    barberoNombre: `${dto.barbero.firstName} ${dto.barbero.lastName}`,
+    dia: DIA_FROM_BACKEND[dto.dayOfWeek] ?? 'LUN',
+    horaInicio: dto.startTime,
+    horaFin: dto.endTime,
+  };
+}
+
+// scheduledAt viaja como instante UTC; se muestra en el horario local del
+// navegador, que para esta app coincide con el de la barberia.
+function splitScheduledAt(iso: string): { fecha: string; hora: string } {
+  const date = new Date(iso);
+  const fecha = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate()
+  ).padStart(2, '0')}`;
+  const hora = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return { fecha, hora };
+}
+
+function toTurno(dto: AppointmentDto): Turno {
+  const { fecha, hora } = splitScheduledAt(dto.scheduledAt);
+  return {
+    id: dto.id,
+    codigo: dto.code,
+    clienteNombre: dto.client.firstName,
+    clienteApellido: dto.client.lastName,
+    clienteTelefono: dto.client.phone,
+    clienteEmail: dto.client.email ?? undefined,
+    barberoId: dto.barberoId,
+    barberoNombre: `${dto.barbero.firstName} ${dto.barbero.lastName}`,
+    fecha,
+    hora,
+    tipoCorteId: dto.tipoCorteId,
+    tipoCorteNombre: dto.tipoCorte.name,
+    estado: ESTADO_FROM_BACKEND[dto.status] ?? 'pendiente',
+  };
+}
+
+// --- Horarios de atencion (panel admin, autenticado) ---
+
+export async function listHorariosRequest(): Promise<Horario[]> {
+  const dtos = await apiRequest<WorkScheduleDto[]>('/appointments/schedules');
+  return dtos.map(toHorario);
+}
+
+export async function createHorarioRequest(input: HorarioInput): Promise<Horario> {
+  const dto = await apiRequest<WorkScheduleDto>('/appointments/schedules', {
+    method: 'POST',
+    body: {
+      barberoId: input.barberoId,
+      dayOfWeek: DIA_TO_BACKEND[input.dia],
+      startTime: input.horaInicio,
+      endTime: input.horaFin,
+    },
+  });
+  return toHorario(dto);
+}
+
+export async function updateHorarioRequest(id: string, input: HorarioInput): Promise<Horario> {
+  const dto = await apiRequest<WorkScheduleDto>(`/appointments/schedules/${id}`, {
+    method: 'PUT',
+    body: {
+      dayOfWeek: DIA_TO_BACKEND[input.dia],
+      startTime: input.horaInicio,
+      endTime: input.horaFin,
+    },
+  });
+  return toHorario(dto);
+}
+
+export function deleteHorarioRequest(id: string): Promise<void> {
+  return apiRequest<void>(`/appointments/schedules/${id}`, { method: 'DELETE' });
+}
+
+export function getAppointmentSettingsRequest(): Promise<AppointmentSettings> {
+  return apiRequest<{ slotMinutes: number }>('/appointments/settings').then((dto) => ({
+    slotMinutos: dto.slotMinutes,
+  }));
+}
+
+export function updateAppointmentSettingsRequest(slotMinutos: number): Promise<AppointmentSettings> {
+  return apiRequest<{ slotMinutes: number }>('/appointments/settings', {
+    method: 'PUT',
+    body: { slotMinutes: slotMinutos },
+  }).then((dto) => ({ slotMinutos: dto.slotMinutes }));
+}
+
+// --- Agenda (panel admin, autenticado; Barbero ve solo la propia) ---
+
+export async function listTurnosRequest(): Promise<Turno[]> {
+  const dtos = await apiRequest<AppointmentDto[]>('/appointments');
+  return dtos.map(toTurno);
+}
+
+export async function updateTurnoEstadoRequest(id: string, estado: TurnoEstado): Promise<Turno> {
+  const dto = await apiRequest<AppointmentDto>(`/appointments/${id}/status`, {
+    method: 'PUT',
+    body: { status: ESTADO_TO_BACKEND[estado] },
+  });
+  return toTurno(dto);
+}
+
+// --- Wizard publico (sin auth) ---
 
 export async function listSlotsDisponiblesRequest(barberoId: string, fecha: string): Promise<string[]> {
-  const horarios = await horariosCollection.list();
-  const dia = diaFromFecha(fecha);
-  const horario = horarios.find((h) => h.barberoId === barberoId && h.dia === dia);
-  if (!horario) return [];
-
-  const slots = generarSlots(horario.horaInicio, horario.horaFin, horario.slotMinutos);
-  const turnos = await turnosCollection.list();
-  const ocupados = new Set(
-    turnos
-      .filter((t) => t.barberoId === barberoId && t.fecha === fecha && t.estado !== 'cancelado')
-      .map((t) => t.hora)
+  if (!barberoId || !fecha) return [];
+  return apiRequest<string[]>(
+    `/public/appointments/availability?barberoId=${encodeURIComponent(barberoId)}&date=${encodeURIComponent(fecha)}`,
+    { auth: false }
   );
-  return slots.filter((slot) => !ocupados.has(slot));
 }
 
 export async function crearTurnoRequest(input: TurnoInput): Promise<Turno> {
-  const codigo = crypto.randomUUID().slice(0, 8).toUpperCase();
-  return turnosCollection.create({ ...input, codigo, estado: 'pendiente' });
+  const dto = await apiRequest<AppointmentDto>('/public/appointments', {
+    method: 'POST',
+    auth: false,
+    body: {
+      firstName: input.clienteNombre,
+      lastName: input.clienteApellido,
+      phone: input.clienteTelefono,
+      email: input.clienteEmail || undefined,
+      barberoId: input.barberoId,
+      tipoCorteId: input.tipoCorteId,
+      date: input.fecha,
+      time: input.hora,
+    },
+  });
+  return toTurno(dto);
 }

@@ -58,3 +58,27 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   return data as T;
 }
+
+// Para endpoints multipart/form-data (ej. carga de imagenes) - apiRequest fuerza
+// JSON, aca dejamos que el navegador arme el boundary del form-data solo.
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  const data = await response.json().catch(() => undefined);
+
+  if (!response.ok) {
+    throw new ApiError(data?.message ?? 'Error de red', response.status);
+  }
+
+  return data as T;
+}

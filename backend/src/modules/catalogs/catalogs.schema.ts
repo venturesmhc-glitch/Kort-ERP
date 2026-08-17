@@ -20,6 +20,9 @@ export const createItemSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   description: z.string().optional(),
   active: z.boolean().optional(),
+  // Solo lo usan los items de la categoria "tipos-corte" (ver modulo Cortes);
+  // el resto de los catalogos lo deja sin definir.
+  price: z.number().int().nonnegative('El precio no puede ser negativo').optional(),
 });
 
 export const updateItemSchema = createItemSchema.partial();

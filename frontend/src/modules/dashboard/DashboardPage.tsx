@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listTurnosRequest } from '../turnos/turnos.api';
-import { listArticulosRequest } from '../articulos/articulos.api';
+import { listStockBajoRequest } from '../articulos/articulos.api';
 import { listVentasRequest } from '../ventas/ventas.api';
 import { listCortesRequest } from '../cortes/cortes.api';
 import type { Turno } from '../turnos/turnos.types';
@@ -12,6 +12,7 @@ const TODAY = todayIso();
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const canSeeStock = user?.role === 'DEV' || user?.role === 'ENCARGADO';
   const [loading, setLoading] = useState(true);
   const [turnosHoy, setTurnosHoy] = useState<Turno[]>([]);
   const [stockBajo, setStockBajo] = useState<Articulo[]>([]);
@@ -20,15 +21,15 @@ export function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const [turnos, articulos, ventas, cortes] = await Promise.all([
+      const [turnos, articulosStockBajo, ventas, cortes] = await Promise.all([
         listTurnosRequest(),
-        listArticulosRequest(),
+        canSeeStock ? listStockBajoRequest() : Promise.resolve([]),
         listVentasRequest(),
         listCortesRequest(),
       ]);
 
       setTurnosHoy(turnos.filter((t) => t.fecha === TODAY));
-      setStockBajo(articulos.filter((a) => a.stock <= 5));
+      setStockBajo(articulosStockBajo);
       setTotalVentas(ventas.reduce((sum, v) => sum + v.total, 0));
 
       const porBarbero = new Map<string, number>();
@@ -40,6 +41,7 @@ export function DashboardPage() {
       setLoading(false);
     }
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -65,10 +67,12 @@ export function DashboardPage() {
               <span className="stat-label">Total vendido</span>
               <span className="stat-value">{formatCurrency(totalVentas)}</span>
             </div>
-            <div className="stat-tile">
-              <span className="stat-label">Alertas de stock</span>
-              <span className="stat-value">{stockBajo.length}</span>
-            </div>
+            {canSeeStock && (
+              <div className="stat-tile">
+                <span className="stat-label">Alertas de stock</span>
+                <span className="stat-value">{stockBajo.length}</span>
+              </div>
+            )}
           </div>
 
           <div className="card-grid">
@@ -88,20 +92,22 @@ export function DashboardPage() {
               )}
             </div>
 
-            <div className="card">
-              <h2>Alertas de stock</h2>
-              {stockBajo.length === 0 ? (
-                <p className="text-muted">Todo el stock esta en niveles saludables.</p>
-              ) : (
-                <ul className="simple-list">
-                  {stockBajo.map((articulo) => (
-                    <li key={articulo.id}>
-                      {articulo.nombre}: quedan {articulo.stock} unidades
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            {canSeeStock && (
+              <div className="card">
+                <h2>Alertas de stock</h2>
+                {stockBajo.length === 0 ? (
+                  <p className="text-muted">Todo el stock esta en niveles saludables.</p>
+                ) : (
+                  <ul className="simple-list">
+                    {stockBajo.map((articulo) => (
+                      <li key={articulo.id}>
+                        {articulo.nombre}: quedan {articulo.stock} unidades
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             <div className="card">
               <h2>Desempeno del equipo</h2>

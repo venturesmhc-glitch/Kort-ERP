@@ -14,6 +14,7 @@ interface ItemDto {
   name: string;
   description: string | null;
   active: boolean;
+  price: number | null;
 }
 
 function toCategory(dto: CategoryDto): CatalogCategory {
@@ -21,11 +22,22 @@ function toCategory(dto: CategoryDto): CatalogCategory {
 }
 
 function toItem(dto: ItemDto): CatalogItem {
-  return { id: dto.id, nombre: dto.name, descripcion: dto.description ?? undefined, activo: dto.active };
+  return {
+    id: dto.id,
+    nombre: dto.name,
+    descripcion: dto.description ?? undefined,
+    activo: dto.active,
+    precio: dto.price ?? undefined,
+  };
 }
 
 function fromInput(input: CatalogInput) {
-  return { name: input.nombre, description: input.descripcion, active: input.activo };
+  return {
+    name: input.nombre,
+    description: input.descripcion,
+    active: input.activo,
+    price: input.precio,
+  };
 }
 
 export async function listCategoriesRequest(): Promise<CatalogCategory[]> {
@@ -71,4 +83,13 @@ export async function deleteCatalogItemRequest(key: CatalogKey, id: string): Pro
 export async function listActiveCatalogItemsRequest(key: CatalogKey): Promise<CatalogItem[]> {
   const dtos = await apiRequest<ItemDto[]>(`/catalogs/${key}/items`);
   return dtos.map(toItem);
+}
+
+// Sin autenticacion: usado por la landing publica (wizard de turnos, tienda),
+// solo expone las keys de la whitelist del backend (ver PUBLIC_CATALOG_KEYS).
+export async function listPublicCatalogItemsRequest(key: CatalogKey): Promise<CatalogItem[]> {
+  const dtos = await apiRequest<{ id: string; name: string }[]>(`/public/catalogs/${key}/items`, {
+    auth: false,
+  });
+  return dtos.map((dto) => ({ id: dto.id, nombre: dto.name, activo: true }));
 }

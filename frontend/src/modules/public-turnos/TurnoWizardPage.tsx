@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { clienteStepSchema, type ClienteStepFormValues } from './turno-wizard.schema';
 import { loadTurnoDraft, saveTurnoDraft, clearTurnoDraft, type TurnoDraft } from './turno-wizard.types';
-import { listBarberosRequest } from '../users/users.api';
-import type { AppUser } from '../users/users.types';
-import { listActiveCatalogItemsRequest } from '../catalogs/catalogs.api';
+import { listPublicBarberosRequest } from '../users/users.api';
+import type { PublicBarbero } from '../users/users.types';
+import { listPublicCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
 import { crearTurnoRequest, listSlotsDisponiblesRequest } from '../turnos/turnos.api';
 import type { Turno } from '../turnos/turnos.types';
@@ -21,7 +21,7 @@ export function TurnoWizardPage() {
 
   const [step, setStep] = useState(1);
   const [cliente, setCliente] = useState<ClienteStepFormValues>(EMPTY_CLIENTE);
-  const [barberos, setBarberos] = useState<AppUser[]>([]);
+  const [barberos, setBarberos] = useState<PublicBarbero[]>([]);
   const [barberoId, setBarberoId] = useState('');
   const [barberoNombre, setBarberoNombre] = useState('');
   const [fecha, setFecha] = useState(TODAY);
@@ -35,8 +35,8 @@ export function TurnoWizardPage() {
   const [turnoConfirmado, setTurnoConfirmado] = useState<Turno | null>(null);
 
   useEffect(() => {
-    listBarberosRequest().then(setBarberos);
-    listActiveCatalogItemsRequest('tipos-corte').then(setTiposCorte);
+    listPublicBarberosRequest().then(setBarberos);
+    listPublicCatalogItemsRequest('tipos-corte').then(setTiposCorte);
   }, []);
 
   useEffect(() => {

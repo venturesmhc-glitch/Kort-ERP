@@ -2,26 +2,33 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { articuloFormSchema, type ArticuloFormValues } from './articulos.schema';
 import { listActiveCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
-import { readFileAsDataUrl } from '../../lib/mockStore';
 
 interface ArticuloFormProps {
   initialValues?: ArticuloFormValues;
-  onSubmit: (values: ArticuloFormValues) => Promise<void>;
+  initialImagenUrl?: string;
+  onSubmit: (values: ArticuloFormValues, imagenFile: File | null) => Promise<void>;
   onCancel: () => void;
 }
 
 const EMPTY_VALUES: ArticuloFormValues = {
   nombre: '',
+  descripcion: '',
   tipoProductoId: '',
   tipoProductoNombre: '',
   precio: 0,
-  stock: 0,
-  imagenUrl: '',
 };
 
-export function ArticuloForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel }: ArticuloFormProps) {
+export function ArticuloForm({
+  initialValues = EMPTY_VALUES,
+  initialImagenUrl,
+  onSubmit,
+  onCancel,
+}: ArticuloFormProps) {
+  const isEditing = initialValues !== EMPTY_VALUES;
   const [values, setValues] = useState<ArticuloFormValues>(initialValues);
   const [tipos, setTipos] = useState<CatalogItem[]>([]);
+  const [imagenFile, setImagenFile] = useState<File | null>(null);
+  const [imagenPreview, setImagenPreview] = useState<string | undefined>(initialImagenUrl);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -39,11 +46,11 @@ export function ArticuloForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const dataUrl = await readFileAsDataUrl(file);
-    setValues((prev) => ({ ...prev, imagenUrl: dataUrl }));
+    setImagenFile(file);
+    setImagenPreview(URL.createObjectURL(file));
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -58,7 +65,7 @@ export function ArticuloForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel 
 
     setSaving(true);
     try {
-      await onSubmit(parsed.data);
+      await onSubmit(parsed.data, imagenFile);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar el articulo');
     } finally {
@@ -73,6 +80,13 @@ export function ArticuloForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel 
         id="nombre"
         value={values.nombre}
         onChange={(e) => setValues((prev) => ({ ...prev, nombre: e.target.value }))}
+      />
+
+      <label htmlFor="descripcion">Descripcion (opcional)</label>
+      <input
+        id="descripcion"
+        value={values.descripcion ?? ''}
+        onChange={(e) => setValues((prev) => ({ ...prev, descripcion: e.target.value }))}
       />
 
       <label htmlFor="tipoProducto">Tipo de producto</label>
@@ -101,26 +115,44 @@ export function ArticuloForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel 
         id="precio"
         type="number"
         min="0"
-        step="0.01"
+        step="1"
         value={values.precio}
         onChange={(e) => setValues((prev) => ({ ...prev, precio: Number(e.target.value) }))}
       />
 
-      <label htmlFor="stock">Stock</label>
+      <label htmlFor="umbralStockBajo">Umbral de stock bajo (opcional)</label>
       <input
-        id="stock"
+        id="umbralStockBajo"
         type="number"
         min="0"
         step="1"
-        value={values.stock}
-        onChange={(e) => setValues((prev) => ({ ...prev, stock: Number(e.target.value) }))}
+        value={values.umbralStockBajo ?? ''}
+        onChange={(e) => {
+          const raw = e.target.value;
+          setValues((prev) => ({ ...prev, umbralStockBajo: raw === '' ? undefined : Number(raw) }));
+        }}
       />
+
+      {!isEditing && (
+        <>
+          <label htmlFor="stockInicial">Stock inicial (opcional)</label>
+          <input
+            id="stockInicial"
+            type="number"
+            min="0"
+            step="1"
+            value={values.stockInicial ?? ''}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setValues((prev) => ({ ...prev, stockInicial: raw === '' ? undefined : Number(raw) }));
+            }}
+          />
+        </>
+      )}
 
       <label htmlFor="imagen">Imagen (opcional)</label>
       <input id="imagen" type="file" accept="image/*" onChange={handleImageChange} />
-      {values.imagenUrl && (
-        <img src={values.imagenUrl} alt="Vista previa" className="image-upload-preview" />
-      )}
+      {imagenPreview && <img src={imagenPreview} alt="Vista previa" className="image-upload-preview" />}
 
       {error && <p className="form-error">{error}</p>}
 

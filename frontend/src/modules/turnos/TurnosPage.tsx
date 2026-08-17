@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   createHorarioRequest,
   deleteHorarioRequest,
-  deleteTurnoRequest,
+  getAppointmentSettingsRequest,
   listHorariosRequest,
   listTurnosRequest,
+  updateAppointmentSettingsRequest,
   updateHorarioRequest,
   updateTurnoEstadoRequest,
 } from './turnos.api';
@@ -18,23 +19,34 @@ import {
   type TurnoEstado,
 } from './turnos.types';
 import { formatDate } from '../../lib/format';
+import { useAuth } from '../auth/AuthContext';
 
 type Tab = 'agenda' | 'horarios';
 
 export function TurnosPage() {
+  const { user } = useAuth();
+  const canManageSchedules = user?.role === 'DEV' || user?.role === 'ENCARGADO';
+
   const [tab, setTab] = useState<Tab>('agenda');
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingHorario, setEditingHorario] = useState<Horario | null>(null);
+  const [slotMinutos, setSlotMinutos] = useState<number | null>(null);
+  const [savingSlot, setSavingSlot] = useState(false);
 
   async function loadAll() {
     setLoading(true);
     try {
-      const [turnosData, horariosData] = await Promise.all([listTurnosRequest(), listHorariosRequest()]);
+      const [turnosData, horariosData, settings] = await Promise.all([
+        listTurnosRequest(),
+        listHorariosRequest(),
+        getAppointmentSettingsRequest(),
+      ]);
       setTurnos([...turnosData].sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora)));
       setHorarios(horariosData);
+      setSlotMinutos(settings.slotMinutos);
     } finally {
       setLoading(false);
     }
@@ -49,10 +61,15 @@ export function TurnosPage() {
     await loadAll();
   }
 
-  async function handleDeleteTurno(id: string) {
-    if (!confirm('¿Eliminar este turno?')) return;
-    await deleteTurnoRequest(id);
-    await loadAll();
+  async function handleSlotMinutosSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!slotMinutos) return;
+    setSavingSlot(true);
+    try {
+      await updateAppointmentSettingsRequest(slotMinutos);
+    } finally {
+      setSavingSlot(false);
+    }
   }
 
   async function handleCreateHorario(values: HorarioInput) {
@@ -78,7 +95,7 @@ export function TurnosPage() {
     <div>
       <div className="page-header">
         <h1>Turnos y horarios de atencion</h1>
-        {tab === 'horarios' && !showForm && !editingHorario && (
+        {tab === 'horarios' && canManageSchedules && !showForm && !editingHorario && (
           <button type="button" onClick={() => setShowForm(true)}>
             Nuevo horario
           </button>
@@ -143,9 +160,11 @@ export function TurnosPage() {
                     </select>
                   </td>
                   <td className="data-table-actions">
-                    <button type="button" onClick={() => handleDeleteTurno(turno.id)}>
-                      Eliminar
-                    </button>
+                    {turno.estado !== 'cancelado' && turno.estado !== 'completado' && (
+                      <button type="button" onClick={() => handleEstadoChange(turno.id, 'cancelado')}>
+                        Cancelar
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -159,6 +178,25 @@ export function TurnosPage() {
         </div>
       ) : (
         <div>
+          {canManageSchedules && slotMinutos !== null && (
+            <form className="client-form" onSubmit={handleSlotMinutosSubmit} style={{ marginBottom: '1.5rem' }}>
+              <label htmlFor="slotMinutos">Duracion del turno para todos los barberos (minutos)</label>
+              <input
+                id="slotMinutos"
+                type="number"
+                min="10"
+                step="5"
+                value={slotMinutos}
+                onChange={(e) => setSlotMinutos(Number(e.target.value))}
+              />
+              <div className="client-form-actions">
+                <button type="submit" disabled={savingSlot}>
+                  {savingSlot ? 'Guardando...' : 'Guardar duracion'}
+                </button>
+              </div>
+            </form>
+          )}
+
           {showForm && (
             <HorarioForm onSubmit={handleCreateHorario} onCancel={() => setShowForm(false)} />
           )}
@@ -170,7 +208,6 @@ export function TurnosPage() {
                 dia: editingHorario.dia,
                 horaInicio: editingHorario.horaInicio,
                 horaFin: editingHorario.horaFin,
-                slotMinutos: editingHorario.slotMinutos,
               }}
               onSubmit={handleUpdateHorario}
               onCancel={() => setEditingHorario(null)}
@@ -183,7 +220,6 @@ export function TurnosPage() {
                   <th>Barbero</th>
                   <th>Dia</th>
                   <th>Horario</th>
-                  <th>Duracion turno</th>
                   <th></th>
                 </tr>
               </thead>
@@ -195,20 +231,23 @@ export function TurnosPage() {
                     <td>
                       {horario.horaInicio} - {horario.horaFin}
                     </td>
-                    <td>{horario.slotMinutos} min</td>
                     <td className="data-table-actions">
-                      <button type="button" onClick={() => setEditingHorario(horario)}>
-                        Editar
-                      </button>
-                      <button type="button" onClick={() => handleDeleteHorario(horario.id)}>
-                        Eliminar
-                      </button>
+                      {canManageSchedules && (
+                        <>
+                          <button type="button" onClick={() => setEditingHorario(horario)}>
+                            Editar
+                          </button>
+                          <button type="button" onClick={() => handleDeleteHorario(horario.id)}>
+                            Eliminar
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
                 {horarios.length === 0 && (
                   <tr>
-                    <td colSpan={5}>No hay horarios cargados todavia.</td>
+                    <td colSpan={4}>No hay horarios cargados todavia.</td>
                   </tr>
                 )}
               </tbody>

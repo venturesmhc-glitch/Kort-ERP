@@ -76,7 +76,9 @@ export function CortesPage() {
                     )}
                   </td>
                   <td>{formatDate(corte.fecha)}</td>
-                  <td>{corte.clienteNombre}</td>
+                  <td>
+                    {corte.clienteNombre} {corte.clienteApellido}
+                  </td>
                   <td>{corte.barberoNombre}</td>
                   <td>{corte.tipoCorteNombre}</td>
                   <td>{formatCurrency(corte.precio)}</td>

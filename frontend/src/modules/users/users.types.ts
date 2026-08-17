@@ -13,3 +13,9 @@ export interface AppUser {
 }
 
 export type UserInput = Omit<AppUser, 'id'>;
+
+export interface PublicBarbero {
+  id: string;
+  firstName: string;
+  lastName: string;
+}

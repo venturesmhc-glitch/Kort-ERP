@@ -40,3 +40,16 @@ export async function deleteClient(id: string) {
   await getClient(id);
   await prisma.client.delete({ where: { id } });
 }
+
+/**
+ * Alta automatica por telefono unico: si ya existe un Client con ese telefono
+ * se reutiliza (usado por el flujo publico de reserva de turnos), si no se crea.
+ */
+export async function findOrCreateClientByPhone(input: CreateClientInput) {
+  const existing = await prisma.client.findUnique({ where: { phone: input.phone } });
+  if (existing) {
+    return existing;
+  }
+
+  return prisma.client.create({ data: input });
+}

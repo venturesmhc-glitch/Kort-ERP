@@ -6,6 +6,8 @@ import { listActiveCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
 import { listClientsRequest } from '../clients/clients.api';
 import type { Client } from '../clients/clients.types';
+import { listTurnosRequest } from '../turnos/turnos.api';
+import type { Turno } from '../turnos/turnos.types';
 import { readFileAsDataUrl } from '../../lib/mockStore';
 import { todayIso } from '../../lib/format';
 
@@ -20,8 +22,10 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [barberos, setBarberos] = useState<AppUser[]>([]);
   const [tiposCorte, setTiposCorte] = useState<CatalogItem[]>([]);
+  const [turnos, setTurnos] = useState<Turno[]>([]);
   const [values, setValues] = useState<CorteFormValues>({
     clienteNombre: '',
+    clienteApellido: '',
     clienteTelefono: '',
     barberoId: '',
     barberoNombre: '',
@@ -30,27 +34,13 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
     precio: 0,
     fecha: TODAY,
     imagenUrl: '',
+    appointmentId: '',
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Se cargan por separado (no con Promise.all) para que si el backend real de
-    // Clientes todavia no esta levantado, los selects de barbero y tipo de corte
-    // (100% mock) sigan funcionando igual.
-    listClientsRequest()
-      .then((clientsData) => {
-        setClients(clientsData);
-        const first = clientsData[0];
-        if (first) {
-          setValues((prev) => ({
-            ...prev,
-            clienteNombre: `${first.firstName} ${first.lastName}`,
-            clienteTelefono: first.phone,
-          }));
-        }
-      })
-      .catch(() => setClients([]));
+    listClientsRequest().then(setClients).catch(() => setClients([]));
 
     listBarberosRequest().then((barberosData) => {
       setBarberos(barberosData);
@@ -68,10 +58,53 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
       setTiposCorte(tiposData);
       const first = tiposData[0];
       if (first) {
-        setValues((prev) => ({ ...prev, tipoCorteId: first.id, tipoCorteNombre: first.nombre }));
+        setValues((prev) => ({
+          ...prev,
+          tipoCorteId: first.id,
+          tipoCorteNombre: first.nombre,
+          precio: first.precio ?? prev.precio,
+        }));
       }
     });
+
+    listTurnosRequest().then(setTurnos).catch(() => setTurnos([]));
   }, []);
+
+  const turnosDelDia = turnos.filter(
+    (t) =>
+      t.barberoId === values.barberoId &&
+      t.fecha === TODAY &&
+      (t.estado === 'pendiente' || t.estado === 'confirmado')
+  );
+
+  function handleClienteExistenteChange(phone: string) {
+    const client = clients.find((c) => c.phone === phone);
+    if (!client) return;
+    setValues((prev) => ({
+      ...prev,
+      clienteNombre: client.firstName,
+      clienteApellido: client.lastName,
+      clienteTelefono: client.phone,
+    }));
+  }
+
+  function handleTurnoChange(appointmentId: string) {
+    if (!appointmentId) {
+      setValues((prev) => ({ ...prev, appointmentId: '' }));
+      return;
+    }
+    const turno = turnosDelDia.find((t) => t.id === appointmentId);
+    if (!turno) return;
+    setValues((prev) => ({
+      ...prev,
+      appointmentId,
+      clienteNombre: turno.clienteNombre,
+      clienteApellido: turno.clienteApellido,
+      clienteTelefono: turno.clienteTelefono,
+      tipoCorteId: turno.tipoCorteId,
+      tipoCorteNombre: turno.tipoCorteNombre,
+    }));
+  }
 
   async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -102,27 +135,6 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
 
   return (
     <form className="client-form" onSubmit={handleSubmit}>
-      <label htmlFor="cliente">Cliente</label>
-      <select
-        id="cliente"
-        value={values.clienteTelefono}
-        onChange={(e) => {
-          const client = clients.find((c) => c.phone === e.target.value);
-          setValues((prev) => ({
-            ...prev,
-            clienteTelefono: e.target.value,
-            clienteNombre: client ? `${client.firstName} ${client.lastName}` : '',
-          }));
-        }}
-      >
-        {clients.length === 0 && <option value="">Sin clientes cargados</option>}
-        {clients.map((client) => (
-          <option key={client.id} value={client.phone}>
-            {client.firstName} {client.lastName}
-          </option>
-        ))}
-      </select>
-
       <label htmlFor="barbero">Barbero</label>
       <select
         id="barbero"
@@ -133,6 +145,7 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
             ...prev,
             barberoId: e.target.value,
             barberoNombre: barbero ? `${barbero.firstName} ${barbero.lastName}` : '',
+            appointmentId: '',
           }));
         }}
       >
@@ -144,6 +157,47 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
         ))}
       </select>
 
+      <label htmlFor="turno">Vincular turno de hoy (opcional)</label>
+      <select id="turno" value={values.appointmentId ?? ''} onChange={(e) => handleTurnoChange(e.target.value)}>
+        <option value="">Sin vincular (walk-in)</option>
+        {turnosDelDia.map((turno) => (
+          <option key={turno.id} value={turno.id}>
+            {turno.hora} · {turno.clienteNombre} {turno.clienteApellido} ({turno.codigo})
+          </option>
+        ))}
+      </select>
+
+      <label htmlFor="clienteExistente">Cliente existente (opcional, autocompleta abajo)</label>
+      <select id="clienteExistente" defaultValue="" onChange={(e) => handleClienteExistenteChange(e.target.value)}>
+        <option value="">Cliente nuevo / buscar por telefono</option>
+        {clients.map((client) => (
+          <option key={client.id} value={client.phone}>
+            {client.firstName} {client.lastName} · {client.phone}
+          </option>
+        ))}
+      </select>
+
+      <label htmlFor="clienteNombre">Nombre del cliente</label>
+      <input
+        id="clienteNombre"
+        value={values.clienteNombre}
+        onChange={(e) => setValues((prev) => ({ ...prev, clienteNombre: e.target.value }))}
+      />
+
+      <label htmlFor="clienteApellido">Apellido del cliente</label>
+      <input
+        id="clienteApellido"
+        value={values.clienteApellido}
+        onChange={(e) => setValues((prev) => ({ ...prev, clienteApellido: e.target.value }))}
+      />
+
+      <label htmlFor="clienteTelefono">Telefono del cliente</label>
+      <input
+        id="clienteTelefono"
+        value={values.clienteTelefono}
+        onChange={(e) => setValues((prev) => ({ ...prev, clienteTelefono: e.target.value }))}
+      />
+
       <label htmlFor="tipoCorte">Tipo de corte</label>
       <select
         id="tipoCorte"
@@ -154,6 +208,7 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
             ...prev,
             tipoCorteId: e.target.value,
             tipoCorteNombre: tipo?.nombre ?? '',
+            precio: tipo?.precio ?? prev.precio,
           }));
         }}
       >
@@ -170,7 +225,7 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
         id="precio"
         type="number"
         min="0"
-        step="0.01"
+        step="1"
         value={values.precio}
         onChange={(e) => setValues((prev) => ({ ...prev, precio: Number(e.target.value) }))}
       />
@@ -186,7 +241,7 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
       <label htmlFor="imagen">Foto del corte (opcional)</label>
       <input id="imagen" type="file" accept="image/*" onChange={handleImageChange} />
       {values.imagenUrl && (
-        <img src={values.imagenUrl} alt="Vista previa" className="image-upload-preview" />
+        <img src={values.imagenUrl} alt={values.clienteNombre} className="image-upload-preview" />
       )}
 
       {error && <p className="form-error">{error}</p>}

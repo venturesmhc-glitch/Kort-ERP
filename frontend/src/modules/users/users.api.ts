@@ -1,5 +1,6 @@
+import { apiRequest } from '../../lib/apiClient';
 import { createMockCollection } from '../../lib/mockStore';
-import type { AppUser, UserInput } from './users.types';
+import type { AppUser, PublicBarbero, UserInput } from './users.types';
 
 const seed: AppUser[] = [
   {
@@ -46,7 +47,14 @@ export const createUserRequest = (input: UserInput) => collection.create(input);
 export const updateUserRequest = (id: string, input: UserInput) => collection.update(id, input);
 export const deleteUserRequest = (id: string) => collection.remove(id);
 
-export async function listBarberosRequest(): Promise<AppUser[]> {
-  const users = await collection.list();
-  return users.filter((user) => user.role === 'BARBERO' && user.active);
+// Barberos activos para el panel admin (ej. HorarioForm), via el backend real
+// y autenticado - no confundir con listUsersRequest/etc de arriba, que siguen
+// siendo mock porque el modulo de Usuarios todavia no tiene CRUD en el backend.
+export function listBarberosRequest(): Promise<AppUser[]> {
+  return apiRequest<AppUser[]>('/users?role=BARBERO&active=true');
+}
+
+// Version publica (sin auth) para el wizard de turnos de la landing.
+export function listPublicBarberosRequest(): Promise<PublicBarbero[]> {
+  return apiRequest<PublicBarbero[]>('/public/barberos', { auth: false });
 }

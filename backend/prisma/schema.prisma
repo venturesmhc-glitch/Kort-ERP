@@ -13,6 +13,23 @@ enum Role {
   BARBERO
 }
 
+enum DayOfWeek {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -27,6 +44,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  workSchedules WorkSchedule[]
+  appointments  Appointment[]
+  cuts          Cut[]
+
   @@map("users")
 }
 
@@ -35,10 +56,80 @@ model Client {
   firstName String
   lastName  String
   phone     String   @unique
+  email     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  appointments Appointment[]
+  cuts         Cut[]
+
   @@map("clients")
+}
+
+// Modulo Turnos: horario semanal de atencion por barbero. El lapso por turno
+// (slotMinutes) es una configuracion global, ver AppointmentSettings.
+model WorkSchedule {
+  id        String    @id @default(uuid())
+  barberoId String
+  barbero   User      @relation(fields: [barberoId], references: [id], onDelete: Cascade)
+  dayOfWeek DayOfWeek
+  startTime String
+  endTime   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([barberoId, dayOfWeek])
+  @@map("work_schedules")
+}
+
+// Configuracion global del modulo Turnos. Fila unica (id fijo en 1).
+model AppointmentSettings {
+  id          Int      @id @default(1)
+  slotMinutes Int      @default(30)
+  updatedAt   DateTime @updatedAt
+
+  @@map("appointment_settings")
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  code            String            @unique
+  clientId        String
+  client          Client            @relation(fields: [clientId], references: [id])
+  barberoId       String
+  barbero         User              @relation(fields: [barberoId], references: [id])
+  tipoCorteId     String
+  tipoCorte       ParameterItem     @relation(fields: [tipoCorteId], references: [id])
+  scheduledAt     DateTime
+  durationMinutes Int
+  status          AppointmentStatus @default(PENDING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  cut Cut?
+
+  @@unique([barberoId, scheduledAt])
+  @@map("appointments")
+}
+
+// Modulo Registro de cortes. El precio es un snapshot copiado de
+// ParameterItem.price al momento del corte, no una referencia (ver Cut.price).
+model Cut {
+  id            String       @id @default(uuid())
+  clientId      String
+  client        Client       @relation(fields: [clientId], references: [id])
+  barberoId     String
+  barbero       User         @relation(fields: [barberoId], references: [id])
+  tipoCorteId   String
+  tipoCorte     ParameterItem @relation(fields: [tipoCorteId], references: [id])
+  price         Int
+  photoUrl      String?
+  appointmentId String?      @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  cutAt         DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+
+  @@map("cuts")
 }
 
 // Modulo Parametrizados: modelo generico (categoria + items) para que se puedan
@@ -67,10 +158,53 @@ model ParameterItem {
   active      Boolean           @default(true)
   order       Int               @default(0)
   metadata    Json?
+  // Precio del tipo de corte (solo lo usan los items de la categoria
+  // "tipos-corte"; el resto de los catalogos lo ignora). Ver modulo Cortes.
+  price       Int?
   deletedAt   DateTime?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+  appointments Appointment[]
+  cuts         Cut[]
+  articles     Article[]
 
   @@unique([categoryId, name])
   @@map("parameter_items")
+}
+
+enum StockMovementType {
+  IN
+  OUT
+}
+
+// Modulo Articulos y Stock: stock es un contador cacheado, actualizado en la
+// misma transaccion que cada StockMovement (ver StockService).
+model Article {
+  id                String          @id @default(uuid())
+  name              String
+  description       String?
+  tipoProductoId    String
+  tipoProducto      ParameterItem   @relation(fields: [tipoProductoId], references: [id])
+  price             Int
+  imageUrl          String?
+  stock             Int             @default(0)
+  lowStockThreshold Int?
+  active            Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  movements         StockMovement[]
+
+  @@map("articles")
+}
+
+model StockMovement {
+  id        String            @id @default(uuid())
+  articleId String
+  article   Article           @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  type      StockMovementType
+  quantity  Int
+  reason    String?
+  createdAt DateTime          @default(now())
+
+  @@map("stock_movements")
 }

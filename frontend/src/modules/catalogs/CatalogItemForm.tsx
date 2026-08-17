@@ -5,6 +5,7 @@ interface CatalogItemFormProps {
   initialValues?: CatalogItemFormValues;
   onSubmit: (values: CatalogItemFormValues) => Promise<void>;
   onCancel: () => void;
+  showPrecio?: boolean;
 }
 
 const EMPTY_VALUES: CatalogItemFormValues = { nombre: '', descripcion: '', activo: true };
@@ -13,6 +14,7 @@ export function CatalogItemForm({
   initialValues = EMPTY_VALUES,
   onSubmit,
   onCancel,
+  showPrecio = false,
 }: CatalogItemFormProps) {
   const [values, setValues] = useState<CatalogItemFormValues>(initialValues);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +55,23 @@ export function CatalogItemForm({
         value={values.descripcion}
         onChange={(e) => setValues((prev) => ({ ...prev, descripcion: e.target.value }))}
       />
+
+      {showPrecio && (
+        <>
+          <label htmlFor="precio">Precio</label>
+          <input
+            id="precio"
+            type="number"
+            min="0"
+            step="1"
+            value={values.precio ?? ''}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setValues((prev) => ({ ...prev, precio: raw === '' ? undefined : Number(raw) }));
+            }}
+          />
+        </>
+      )}
 
       <label className="checkbox-field">
         <input

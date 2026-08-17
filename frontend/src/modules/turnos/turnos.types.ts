@@ -19,10 +19,14 @@ export interface Horario {
   dia: DiaSemana;
   horaInicio: string;
   horaFin: string;
-  slotMinutos: number;
 }
 
 export type HorarioInput = Omit<Horario, 'id'>;
+
+// El lapso por turno es una configuracion global (no por horario), ver skills.md.
+export interface AppointmentSettings {
+  slotMinutos: number;
+}
 
 export type TurnoEstado = 'pendiente' | 'confirmado' | 'completado' | 'cancelado';
 

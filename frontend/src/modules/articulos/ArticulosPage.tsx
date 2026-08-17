@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import {
   createArticuloRequest,
+  crearMovimientoRequest,
   deleteArticuloRequest,
   listArticulosRequest,
   updateArticuloRequest,
+  uploadImagenRequest,
 } from './articulos.api';
 import { ArticuloForm } from './ArticuloForm';
+import { StockMovementForm } from './StockMovementForm';
 import type { Articulo } from './articulos.types';
-import type { ArticuloFormValues } from './articulos.schema';
+import type { ArticuloFormValues, MovimientoFormValues } from './articulos.schema';
 import { formatCurrency } from '../../lib/format';
 
 export function ArticulosPage() {
@@ -15,6 +18,7 @@ export function ArticulosPage() {
   const [loading, setLoading] = useState(true);
   const [editingArticulo, setEditingArticulo] = useState<Articulo | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [movementArticulo, setMovementArticulo] = useState<Articulo | null>(null);
 
   async function loadArticulos() {
     setLoading(true);
@@ -29,15 +33,21 @@ export function ArticulosPage() {
     loadArticulos();
   }, []);
 
-  async function handleCreate(values: ArticuloFormValues) {
-    await createArticuloRequest(values);
+  async function handleCreate(values: ArticuloFormValues, imagenFile: File | null) {
+    const articulo = await createArticuloRequest(values);
+    if (imagenFile) {
+      await uploadImagenRequest(articulo.id, imagenFile);
+    }
     setShowForm(false);
     await loadArticulos();
   }
 
-  async function handleUpdate(values: ArticuloFormValues) {
+  async function handleUpdate(values: ArticuloFormValues, imagenFile: File | null) {
     if (!editingArticulo) return;
     await updateArticuloRequest(editingArticulo.id, values);
+    if (imagenFile) {
+      await uploadImagenRequest(editingArticulo.id, imagenFile);
+    }
     setEditingArticulo(null);
     await loadArticulos();
   }
@@ -48,11 +58,18 @@ export function ArticulosPage() {
     await loadArticulos();
   }
 
+  async function handleMovement(values: MovimientoFormValues) {
+    if (!movementArticulo) return;
+    await crearMovimientoRequest(movementArticulo.id, values);
+    setMovementArticulo(null);
+    await loadArticulos();
+  }
+
   return (
     <div>
       <div className="page-header">
         <h1>Articulos y stock</h1>
-        {!showForm && !editingArticulo && (
+        {!showForm && !editingArticulo && !movementArticulo && (
           <button type="button" onClick={() => setShowForm(true)}>
             Nuevo articulo
           </button>
@@ -65,14 +82,23 @@ export function ArticulosPage() {
         <ArticuloForm
           initialValues={{
             nombre: editingArticulo.nombre,
+            descripcion: editingArticulo.descripcion ?? '',
             tipoProductoId: editingArticulo.tipoProductoId,
             tipoProductoNombre: editingArticulo.tipoProductoNombre,
             precio: editingArticulo.precio,
-            stock: editingArticulo.stock,
-            imagenUrl: editingArticulo.imagenUrl ?? '',
+            umbralStockBajo: editingArticulo.umbralStockBajo,
           }}
+          initialImagenUrl={editingArticulo.imagenUrl}
           onSubmit={handleUpdate}
           onCancel={() => setEditingArticulo(null)}
+        />
+      )}
+
+      {movementArticulo && (
+        <StockMovementForm
+          articulo={movementArticulo}
+          onSubmit={handleMovement}
+          onCancel={() => setMovementArticulo(null)}
         />
       )}
 
@@ -105,11 +131,20 @@ export function ArticulosPage() {
                   <td>{articulo.tipoProductoNombre}</td>
                   <td>{formatCurrency(articulo.precio)}</td>
                   <td>
-                    <span className={articulo.stock <= 5 ? 'badge badge-warning' : 'badge badge-success'}>
+                    <span
+                      className={
+                        articulo.umbralStockBajo !== undefined && articulo.stock <= articulo.umbralStockBajo
+                          ? 'badge badge-warning'
+                          : 'badge badge-success'
+                      }
+                    >
                       {articulo.stock}
                     </span>
                   </td>
                   <td className="data-table-actions">
+                    <button type="button" onClick={() => setMovementArticulo(articulo)}>
+                      Movimiento
+                    </button>
                     <button type="button" onClick={() => setEditingArticulo(articulo)}>
                       Editar
                     </button>

@@ -12,6 +12,7 @@ import { CatalogItemForm } from './CatalogItemForm';
 import type { CatalogCategory, CatalogItem, CatalogKey } from './catalogs.types';
 import type { CatalogItemFormValues } from './catalogs.schema';
 import { ApiError } from '../../lib/apiClient';
+import { formatCurrency } from '../../lib/format';
 
 const ACCENTED_CHARS: Record<string, string> = {
   a: 'aàáâãäå',
@@ -73,6 +74,7 @@ export function ParametrizadosPage() {
   }, [activeKey]);
 
   const activeCategory = categories.find((c) => c.key === activeKey) ?? null;
+  const showPrecio = activeKey === 'tipos-corte';
 
   async function handleCreate(values: CatalogItemFormValues) {
     if (!activeKey) return;
@@ -178,7 +180,11 @@ export function ParametrizadosPage() {
       </div>
 
       {showForm && (
-        <CatalogItemForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />
+        <CatalogItemForm
+          onSubmit={handleCreate}
+          onCancel={() => setShowForm(false)}
+          showPrecio={showPrecio}
+        />
       )}
 
       {editingItem && (
@@ -187,9 +193,11 @@ export function ParametrizadosPage() {
             nombre: editingItem.nombre,
             descripcion: editingItem.descripcion ?? '',
             activo: editingItem.activo,
+            precio: editingItem.precio,
           }}
           onSubmit={handleUpdate}
           onCancel={() => setEditingItem(null)}
+          showPrecio={showPrecio}
         />
       )}
 
@@ -202,6 +210,7 @@ export function ParametrizadosPage() {
               <tr>
                 <th>Nombre</th>
                 <th>Descripcion</th>
+                {showPrecio && <th>Precio</th>}
                 <th>Estado</th>
                 <th></th>
               </tr>
@@ -211,6 +220,7 @@ export function ParametrizadosPage() {
                 <tr key={item.id}>
                   <td>{item.nombre}</td>
                   <td>{item.descripcion ?? '-'}</td>
+                  {showPrecio && <td>{item.precio !== undefined ? formatCurrency(item.precio) : '-'}</td>}
                   <td>
                     <span className={item.activo ? 'badge badge-success' : 'badge badge-muted'}>
                       {item.activo ? 'Activo' : 'Inactivo'}
@@ -228,7 +238,7 @@ export function ParametrizadosPage() {
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan={4}>No hay registros en este catalogo todavia.</td>
+                  <td colSpan={showPrecio ? 5 : 4}>No hay registros en este catalogo todavia.</td>
                 </tr>
               )}
             </tbody>

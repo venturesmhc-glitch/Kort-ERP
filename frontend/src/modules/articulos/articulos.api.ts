@@ -1,72 +1,117 @@
-import { createMockCollection } from '../../lib/mockStore';
-import type { Articulo, ArticuloInput } from './articulos.types';
+import { apiRequest, apiUpload } from '../../lib/apiClient';
+import type { Articulo, MovimientoStock } from './articulos.types';
+import type { ArticuloFormValues, MovimientoFormValues } from './articulos.schema';
 
-const seed: Articulo[] = [
-  {
-    id: 'art-cera',
-    nombre: 'Cera modeladora',
-    tipoProductoId: 'prod-cosmetica',
-    tipoProductoNombre: 'Cosmetica',
-    precio: 4500,
-    stock: 20,
-  },
-  {
-    id: 'art-aceite-barba',
-    nombre: 'Aceite para barba',
-    tipoProductoId: 'prod-cosmetica',
-    tipoProductoNombre: 'Cosmetica',
-    precio: 5200,
-    stock: 15,
-  },
-  {
-    id: 'art-gorra',
-    nombre: 'Gorra Kort',
-    tipoProductoId: 'prod-indumentaria',
-    tipoProductoNombre: 'Indumentaria',
-    precio: 8900,
-    stock: 10,
-  },
-  {
-    id: 'art-remera',
-    nombre: 'Remera Kort',
-    tipoProductoId: 'prod-indumentaria',
-    tipoProductoNombre: 'Indumentaria',
-    precio: 12000,
-    stock: 12,
-  },
-  {
-    id: 'art-peine',
-    nombre: 'Peine de bolsillo',
-    tipoProductoId: 'prod-accesorios',
-    tipoProductoNombre: 'Accesorios',
-    precio: 2500,
-    stock: 30,
-  },
-  {
-    id: 'art-navaja',
-    nombre: 'Navaja clasica',
-    tipoProductoId: 'prod-accesorios',
-    tipoProductoNombre: 'Accesorios',
-    precio: 15000,
-    stock: 5,
-  },
-];
+interface ArticleDto {
+  id: string;
+  name: string;
+  description: string | null;
+  tipoProductoId: string;
+  tipoProducto: { id: string; name: string };
+  price: number;
+  imageUrl: string | null;
+  stock: number;
+  lowStockThreshold: number | null;
+}
 
-const collection = createMockCollection<Articulo>('articulos', seed);
+interface MovementDto {
+  id: string;
+  type: 'IN' | 'OUT';
+  quantity: number;
+  reason: string | null;
+  createdAt: string;
+}
 
-export const listArticulosRequest = () => collection.list();
-export const createArticuloRequest = (input: ArticuloInput) => collection.create(input);
-export const updateArticuloRequest = (id: string, input: ArticuloInput) => collection.update(id, input);
-export const deleteArticuloRequest = (id: string) => collection.remove(id);
+function toArticulo(dto: ArticleDto): Articulo {
+  return {
+    id: dto.id,
+    nombre: dto.name,
+    descripcion: dto.description ?? undefined,
+    tipoProductoId: dto.tipoProductoId,
+    tipoProductoNombre: dto.tipoProducto.name,
+    precio: dto.price,
+    stock: dto.stock,
+    umbralStockBajo: dto.lowStockThreshold ?? undefined,
+    imagenUrl: dto.imageUrl ?? undefined,
+  };
+}
 
-export async function adjustStockRequest(id: string, delta: number): Promise<Articulo> {
-  const item = await collection.get(id);
-  if (!item) {
-    throw new Error('Articulo no encontrado');
-  }
-  const nextStock = item.stock + delta;
-  if (nextStock < 0) {
-    throw new Error('Stock insuficiente');
-  }
-  return collection.update(id, { stock: nextStock });
+function toMovimiento(dto: MovementDto): MovimientoStock {
+  return {
+    id: dto.id,
+    tipo: dto.type === 'IN' ? 'ingreso' : 'egreso',
+    cantidad: dto.quantity,
+    motivo: dto.reason ?? undefined,
+    fecha: dto.createdAt,
+  };
+}
+
+export async function listArticulosRequest(): Promise<Articulo[]> {
+  const dtos = await apiRequest<ArticleDto[]>('/articles');
+  return dtos.map(toArticulo);
+}
+
+export async function listStockBajoRequest(): Promise<Articulo[]> {
+  const dtos = await apiRequest<ArticleDto[]>('/articles/low-stock');
+  return dtos.map(toArticulo);
+}
+
+export async function createArticuloRequest(input: ArticuloFormValues): Promise<Articulo> {
+  const dto = await apiRequest<ArticleDto>('/articles', {
+    method: 'POST',
+    body: {
+      name: input.nombre,
+      description: input.descripcion || undefined,
+      tipoProductoId: input.tipoProductoId,
+      price: input.precio,
+      lowStockThreshold: input.umbralStockBajo,
+      stock: input.stockInicial,
+    },
+  });
+  return toArticulo(dto);
+}
+
+export async function updateArticuloRequest(id: string, input: ArticuloFormValues): Promise<Articulo> {
+  const dto = await apiRequest<ArticleDto>(`/articles/${id}`, {
+    method: 'PUT',
+    body: {
+      name: input.nombre,
+      description: input.descripcion || undefined,
+      tipoProductoId: input.tipoProductoId,
+      price: input.precio,
+      lowStockThreshold: input.umbralStockBajo,
+    },
+  });
+  return toArticulo(dto);
+}
+
+export function deleteArticuloRequest(id: string): Promise<void> {
+  return apiRequest<void>(`/articles/${id}`, { method: 'DELETE' });
+}
+
+export async function uploadImagenRequest(articuloId: string, file: File): Promise<Articulo> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const dto = await apiUpload<ArticleDto>(`/articles/${articuloId}/image`, formData);
+  return toArticulo(dto);
+}
+
+export async function listMovimientosRequest(articuloId: string): Promise<MovimientoStock[]> {
+  const dtos = await apiRequest<MovementDto[]>(`/articles/${articuloId}/movements`);
+  return dtos.map(toMovimiento);
+}
+
+export async function crearMovimientoRequest(
+  articuloId: string,
+  input: MovimientoFormValues
+): Promise<Articulo> {
+  const dto = await apiRequest<ArticleDto>(`/articles/${articuloId}/movements`, {
+    method: 'POST',
+    body: {
+      type: input.tipo === 'ingreso' ? 'IN' : 'OUT',
+      quantity: input.cantidad,
+      reason: input.motivo || undefined,
+    },
+  });
+  return toArticulo(dto);
 }

@@ -15,6 +15,8 @@ export interface CatalogItem {
   nombre: string;
   descripcion?: string;
   activo: boolean;
+  // Solo lo usan los items de la categoria "tipos-corte" (ver modulo Cortes).
+  precio?: number;
 }
 
 export type CatalogInput = Omit<CatalogItem, 'id'>;
