@@ -10,11 +10,17 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Dashboard', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
-  { to: '/clientes', label: 'Clientes', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
-  { to: '/usuarios', label: 'Usuarios', roles: ['DEV', 'ENCARGADO'] },
-  { to: '/jornadas', label: 'Jornadas laborales', roles: ['DEV', 'ENCARGADO'] },
-  { to: '/estadisticas', label: 'Estadisticas', roles: ['DEV', 'ENCARGADO'] },
+  { to: '/admin', label: 'Dashboard', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
+  { to: '/admin/clientes', label: 'Clientes', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
+  { to: '/admin/turnos', label: 'Turnos y horarios', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
+  { to: '/admin/cortes', label: 'Registro de cortes', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
+  { to: '/admin/articulos', label: 'Articulos y stock', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
+  { to: '/admin/ventas', label: 'Ventas', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
+  { to: '/admin/tesoreria', label: 'Tesoreria', roles: ['DEV', 'ENCARGADO'] },
+  { to: '/admin/parametrizados', label: 'Parametrizados', roles: ['DEV', 'ENCARGADO'] },
+  { to: '/admin/usuarios', label: 'Usuarios', roles: ['DEV', 'ENCARGADO'] },
+  { to: '/admin/jornadas', label: 'Jornadas laborales', roles: ['DEV', 'ENCARGADO'] },
+  { to: '/admin/estadisticas', label: 'Estadisticas', roles: ['DEV', 'ENCARGADO'] },
 ];
 
 export function AdminLayout() {
@@ -25,13 +31,15 @@ export function AdminLayout() {
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
-        <div className="admin-logo">Kort</div>
+        <NavLink to="/admin" end className="admin-logo">
+          Kort
+        </NavLink>
         <nav>
           {visibleItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === '/'}
+              end={item.to === '/admin'}
               className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
             >
               {item.label}
@@ -50,6 +58,9 @@ export function AdminLayout() {
             )}
           </div>
           <div className="admin-header-actions">
+            <NavLink to="/" className="nav-link">
+              Ver sitio publico
+            </NavLink>
             <ThemeToggle />
             <button type="button" onClick={logout}>
               Cerrar sesion

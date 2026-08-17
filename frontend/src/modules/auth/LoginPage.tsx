@@ -30,7 +30,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       await login(parsed.data.email, parsed.data.password);
-      navigate('/');
+      navigate('/admin');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo iniciar sesion');
     } finally {
