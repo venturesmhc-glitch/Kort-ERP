@@ -42,12 +42,12 @@ export const router = createBrowserRouter([
           { path: 'clientes', element: <ClientsPage /> },
           { path: 'turnos', element: <TurnosPage /> },
           { path: 'cortes', element: <CortesPage /> },
-          { path: 'ventas', element: <VentasPage /> },
-          { path: 'tesoreria', element: <TesoreriaPage /> },
           {
             element: <ProtectedRoute allowedRoles={['DEV', 'ENCARGADO']} />,
             children: [
               { path: 'articulos', element: <ArticulosPage /> },
+              { path: 'ventas', element: <VentasPage /> },
+              { path: 'tesoreria', element: <TesoreriaPage /> },
               { path: 'parametrizados', element: <ParametrizadosPage /> },
               { path: 'usuarios', element: <UsersPage /> },
               { path: 'jornadas', element: <JornadasPage /> },

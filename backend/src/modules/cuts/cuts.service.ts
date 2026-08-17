@@ -2,18 +2,9 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
+import { TreasuryService } from '../treasury/treasury.service.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import type { CreateCutInput } from './cuts.schema.js';
-
-// Gancho a Tesoreria: la integracion real es una etapa posterior del roadmap,
-// mismo patron que NotificationService en Turnos.
-export const TreasuryService = {
-  async recordIncomeFromCut(cut: { id: string; price: number }) {
-    console.log(
-      `[TreasuryService] Ingreso por corte ${cut.id}: $${cut.price} - no-op, falta integrar Tesoreria`
-    );
-  },
-};
 
 const CUT_INCLUDE = {
   client: true,

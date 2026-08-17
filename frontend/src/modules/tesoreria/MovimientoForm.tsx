@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { movimientoFormSchema, type MovimientoFormValues } from './tesoreria.schema';
-import { MOVIMIENTO_TIPO_LABELS, type MovimientoTipo } from './tesoreria.types';
+import { MOVIMIENTO_TIPO_LABELS, type MovimientoTipoUI } from './tesoreria.types';
 import { listActiveCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
 import { todayIso } from '../../lib/format';
@@ -21,7 +21,7 @@ const EMPTY_VALUES: MovimientoFormValues = {
   descripcion: '',
 };
 
-function catalogKeyForTipo(tipo: MovimientoTipo) {
+function catalogKeyForTipo(tipo: MovimientoTipoUI) {
   return tipo === 'ingreso' ? 'categorias-ingresos' : 'categorias-costos';
 }
 
@@ -69,7 +69,7 @@ export function MovimientoForm({ onSubmit, onCancel }: MovimientoFormProps) {
       <select
         id="tipo"
         value={values.tipo}
-        onChange={(e) => setValues((prev) => ({ ...prev, tipo: e.target.value as MovimientoTipo }))}
+        onChange={(e) => setValues((prev) => ({ ...prev, tipo: e.target.value as MovimientoTipoUI }))}
       >
         {Object.entries(MOVIMIENTO_TIPO_LABELS).map(([key, label]) => (
           <option key={key} value={key}>

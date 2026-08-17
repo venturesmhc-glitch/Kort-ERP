@@ -1,21 +1,45 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { ventaFormSchema, type VentaFormValues } from './ventas.schema';
+import {
+  ventaItemFormSchema,
+  clienteVentaFormSchema,
+  type VentaItemFormValues,
+  type ClienteVentaFormValues,
+} from './ventas.schema';
 import { listPublicArticulosRequest } from '../articulos/articulos.api';
 import type { Articulo } from '../articulos/articulos.types';
+import { listClientsRequest } from '../clients/clients.api';
+import type { Client } from '../clients/clients.types';
 import { formatCurrency } from '../../lib/format';
+import type { CrearVentaInput, CrearVentaItemInput } from './ventas.api';
+
+interface CartLine extends CrearVentaItemInput {
+  key: string;
+  articuloNombre: string;
+}
 
 interface VentaFormProps {
-  onSubmit: (values: VentaFormValues) => Promise<void>;
+  onSubmit: (values: CrearVentaInput) => Promise<void>;
   onCancel: () => void;
 }
 
+type ClienteModo = 'ninguno' | 'existente' | 'nuevo';
+
 export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
   const [articulos, setArticulos] = useState<Articulo[]>([]);
-  const [values, setValues] = useState<VentaFormValues>({
+  const [clients, setClients] = useState<Client[]>([]);
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [itemValues, setItemValues] = useState<VentaItemFormValues>({
     articuloId: '',
     articuloNombre: '',
     cantidad: 1,
     precioUnitario: 0,
+  });
+  const [clienteModo, setClienteModo] = useState<ClienteModo>('ninguno');
+  const [clienteId, setClienteId] = useState('');
+  const [clienteNuevo, setClienteNuevo] = useState<ClienteVentaFormValues>({
+    firstName: '',
+    lastName: '',
+    phone: '',
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -26,7 +50,7 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
       setArticulos(disponibles);
       const first = disponibles[0];
       if (first) {
-        setValues((prev) => ({
+        setItemValues((prev) => ({
           ...prev,
           articuloId: first.id,
           articuloNombre: first.nombre,
@@ -34,29 +58,81 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
         }));
       }
     });
+    listClientsRequest()
+      .then(setClients)
+      .catch(() => setClients([]));
   }, []);
 
-  const articuloSeleccionado = articulos.find((a) => a.id === values.articuloId);
-  const total = values.cantidad * values.precioUnitario;
+  const articuloSeleccionado = articulos.find((a) => a.id === itemValues.articuloId);
+  const cantidadEnCarrito = cart
+    .filter((line) => line.articuloId === itemValues.articuloId)
+    .reduce((sum, line) => sum + line.cantidad, 0);
+  const disponible = articuloSeleccionado ? articuloSeleccionado.stock - cantidadEnCarrito : 0;
+
+  function handleAgregarItem() {
+    setError(null);
+    const parsed = ventaItemFormSchema.safeParse(itemValues);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Datos invalidos');
+      return;
+    }
+    if (parsed.data.cantidad > disponible) {
+      setError(`Stock insuficiente (disponible: ${disponible})`);
+      return;
+    }
+    setCart((prev) => [
+      ...prev,
+      {
+        key: `${parsed.data.articuloId}-${Date.now()}`,
+        articuloId: parsed.data.articuloId,
+        articuloNombre: parsed.data.articuloNombre,
+        cantidad: parsed.data.cantidad,
+        precioUnitario: parsed.data.precioUnitario,
+      },
+    ]);
+    setItemValues((prev) => ({ ...prev, cantidad: 1 }));
+  }
+
+  function handleQuitarItem(key: string) {
+    setCart((prev) => prev.filter((line) => line.key !== key));
+  }
+
+  const total = cart.reduce((sum, line) => sum + line.cantidad * line.precioUnitario, 0);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
 
-    const parsed = ventaFormSchema.safeParse(values);
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos invalidos');
+    if (cart.length === 0) {
+      setError('Agrega al menos un articulo al carrito');
       return;
     }
 
-    if (articuloSeleccionado && parsed.data.cantidad > articuloSeleccionado.stock) {
-      setError(`Stock insuficiente (disponible: ${articuloSeleccionado.stock})`);
+    let clienteNuevoPayload: ClienteVentaFormValues | undefined;
+    if (clienteModo === 'nuevo') {
+      const parsedCliente = clienteVentaFormSchema.safeParse(clienteNuevo);
+      if (!parsedCliente.success) {
+        setError(parsedCliente.error.issues[0]?.message ?? 'Datos del cliente invalidos');
+        return;
+      }
+      clienteNuevoPayload = parsedCliente.data;
+    }
+    if (clienteModo === 'existente' && !clienteId) {
+      setError('Selecciona un cliente');
       return;
     }
 
     setSaving(true);
     try {
-      await onSubmit(parsed.data);
+      await onSubmit({
+        items: cart.map(({ articuloId, cantidad, precioUnitario }) => ({
+          articuloId,
+          cantidad,
+          precioUnitario,
+        })),
+        clienteId: clienteModo === 'existente' ? clienteId : undefined,
+        clienteNuevo: clienteNuevoPayload,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo registrar la venta');
     } finally {
@@ -66,13 +142,14 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
 
   return (
     <form className="client-form" onSubmit={handleSubmit}>
+      <h3>Agregar articulo</h3>
       <label htmlFor="articulo">Articulo</label>
       <select
         id="articulo"
-        value={values.articuloId}
+        value={itemValues.articuloId}
         onChange={(e) => {
           const articulo = articulos.find((a) => a.id === e.target.value);
-          setValues((prev) => ({
+          setItemValues((prev) => ({
             ...prev,
             articuloId: e.target.value,
             articuloNombre: articulo?.nombre ?? '',
@@ -94,8 +171,8 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
         type="number"
         min="1"
         step="1"
-        value={values.cantidad}
-        onChange={(e) => setValues((prev) => ({ ...prev, cantidad: Number(e.target.value) }))}
+        value={itemValues.cantidad}
+        onChange={(e) => setItemValues((prev) => ({ ...prev, cantidad: Number(e.target.value) }))}
       />
 
       <label htmlFor="precioUnitario">Precio unitario</label>
@@ -104,13 +181,93 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
         type="number"
         min="0"
         step="0.01"
-        value={values.precioUnitario}
-        onChange={(e) => setValues((prev) => ({ ...prev, precioUnitario: Number(e.target.value) }))}
+        value={itemValues.precioUnitario}
+        onChange={(e) => setItemValues((prev) => ({ ...prev, precioUnitario: Number(e.target.value) }))}
       />
 
+      <button type="button" onClick={handleAgregarItem} disabled={articulos.length === 0}>
+        Agregar al carrito
+      </button>
+
+      {cart.length > 0 && (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Articulo</th>
+                <th>Cantidad</th>
+                <th>Precio unit.</th>
+                <th>Subtotal</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {cart.map((line) => (
+                <tr key={line.key}>
+                  <td>{line.articuloNombre}</td>
+                  <td>{line.cantidad}</td>
+                  <td>{formatCurrency(line.precioUnitario)}</td>
+                  <td>{formatCurrency(line.cantidad * line.precioUnitario)}</td>
+                  <td className="data-table-actions">
+                    <button type="button" onClick={() => handleQuitarItem(line.key)}>
+                      Quitar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <p>
-        Total: <strong>{formatCurrency(total)}</strong>
+        Total del carrito: <strong>{formatCurrency(total)}</strong>
       </p>
+
+      <h3>Cliente (opcional)</h3>
+      <label htmlFor="clienteModo">Asociar cliente</label>
+      <select id="clienteModo" value={clienteModo} onChange={(e) => setClienteModo(e.target.value as ClienteModo)}>
+        <option value="ninguno">Venta de mostrador (sin cliente)</option>
+        <option value="existente">Cliente existente</option>
+        <option value="nuevo">Cliente nuevo (por telefono)</option>
+      </select>
+
+      {clienteModo === 'existente' && (
+        <>
+          <label htmlFor="clienteExistente">Cliente</label>
+          <select id="clienteExistente" value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
+            <option value="">Seleccionar...</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.firstName} {client.lastName} · {client.phone}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+
+      {clienteModo === 'nuevo' && (
+        <>
+          <label htmlFor="clienteNombre">Nombre</label>
+          <input
+            id="clienteNombre"
+            value={clienteNuevo.firstName}
+            onChange={(e) => setClienteNuevo((prev) => ({ ...prev, firstName: e.target.value }))}
+          />
+          <label htmlFor="clienteApellido">Apellido</label>
+          <input
+            id="clienteApellido"
+            value={clienteNuevo.lastName}
+            onChange={(e) => setClienteNuevo((prev) => ({ ...prev, lastName: e.target.value }))}
+          />
+          <label htmlFor="clienteTelefono">Telefono</label>
+          <input
+            id="clienteTelefono"
+            value={clienteNuevo.phone}
+            onChange={(e) => setClienteNuevo((prev) => ({ ...prev, phone: e.target.value }))}
+          />
+        </>
+      )}
 
       {error && <p className="form-error">{error}</p>}
 
@@ -118,7 +275,7 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
         <button type="button" onClick={onCancel} disabled={saving}>
           Cancelar
         </button>
-        <button type="submit" disabled={saving || articulos.length === 0}>
+        <button type="submit" disabled={saving || cart.length === 0}>
           {saving ? 'Confirmando...' : 'Confirmar venta'}
         </button>
       </div>

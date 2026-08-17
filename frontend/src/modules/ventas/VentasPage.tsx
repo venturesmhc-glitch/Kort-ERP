@@ -1,33 +1,49 @@
 import { useEffect, useState } from 'react';
-import { crearVentaRequest, listVentasRequest } from './ventas.api';
+import { crearVentaRequest, listVentasRequest, type ListVentasFiltros } from './ventas.api';
 import { VentaForm } from './VentaForm';
 import type { Venta } from './ventas.types';
-import type { VentaFormValues } from './ventas.schema';
-import { formatCurrency, formatDate } from '../../lib/format';
+import type { CrearVentaInput } from './ventas.api';
+import { listPublicArticulosRequest } from '../articulos/articulos.api';
+import type { Articulo } from '../articulos/articulos.types';
+import { formatCurrency, formatDate, toLocalIso } from '../../lib/format';
+
+function fechaHora(iso: string) {
+  return `${formatDate(toLocalIso(new Date(iso)))} ${new Date(iso).toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`;
+}
 
 export function VentasPage() {
   const [ventas, setVentas] = useState<Venta[]>([]);
+  const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [filtros, setFiltros] = useState<ListVentasFiltros>({});
 
-  async function loadVentas() {
+  async function loadVentas(activeFiltros: ListVentasFiltros) {
     setLoading(true);
     try {
-      const data = await listVentasRequest();
-      setVentas([...data].reverse());
+      setVentas(await listVentasRequest(activeFiltros));
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadVentas();
+    loadVentas(filtros);
+    listPublicArticulosRequest().then(setArticulos).catch(() => setArticulos([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleCreate(values: VentaFormValues) {
+  async function handleCreate(values: CrearVentaInput) {
     await crearVentaRequest(values);
     setShowForm(false);
-    await loadVentas();
+    await loadVentas(filtros);
+  }
+
+  function handleFiltrar() {
+    loadVentas(filtros);
   }
 
   const totalVendido = ventas.reduce((sum, v) => sum + v.total, 0);
@@ -56,6 +72,39 @@ export function VentasPage() {
         </div>
       </div>
 
+      <div className="client-form" style={{ marginBottom: '1rem' }}>
+        <label htmlFor="fechaDesde">Desde</label>
+        <input
+          id="fechaDesde"
+          type="date"
+          value={filtros.fechaDesde ?? ''}
+          onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value || undefined }))}
+        />
+        <label htmlFor="fechaHasta">Hasta</label>
+        <input
+          id="fechaHasta"
+          type="date"
+          value={filtros.fechaHasta ?? ''}
+          onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value || undefined }))}
+        />
+        <label htmlFor="articuloFiltro">Articulo</label>
+        <select
+          id="articuloFiltro"
+          value={filtros.articuloId ?? ''}
+          onChange={(e) => setFiltros((prev) => ({ ...prev, articuloId: e.target.value || undefined }))}
+        >
+          <option value="">Todos</option>
+          {articulos.map((articulo) => (
+            <option key={articulo.id} value={articulo.id}>
+              {articulo.nombre}
+            </option>
+          ))}
+        </select>
+        <button type="button" onClick={handleFiltrar}>
+          Filtrar
+        </button>
+      </div>
+
       {loading ? (
         <p>Cargando...</p>
       ) : (
@@ -64,19 +113,19 @@ export function VentasPage() {
             <thead>
               <tr>
                 <th>Fecha</th>
-                <th>Articulo</th>
-                <th>Cantidad</th>
-                <th>Precio unitario</th>
+                <th>Cliente</th>
+                <th>Vendedor</th>
+                <th>Articulos</th>
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
               {ventas.map((venta) => (
                 <tr key={venta.id}>
-                  <td>{formatDate(venta.fecha)}</td>
-                  <td>{venta.articuloNombre}</td>
-                  <td>{venta.cantidad}</td>
-                  <td>{formatCurrency(venta.precioUnitario)}</td>
+                  <td>{fechaHora(venta.fecha)}</td>
+                  <td>{venta.clienteNombre ?? 'Mostrador'}</td>
+                  <td>{venta.vendedorNombre ?? '-'}</td>
+                  <td>{venta.items.map((item) => `${item.articuloNombre} x${item.cantidad}`).join(', ')}</td>
                   <td>{formatCurrency(venta.total)}</td>
                 </tr>
               ))}

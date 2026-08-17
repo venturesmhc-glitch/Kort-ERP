@@ -4,9 +4,18 @@ import { listPublicArticulosRequest } from '../articulos/articulos.api';
 import type { Articulo } from '../articulos/articulos.types';
 import { listPublicCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
-import { crearVentaRequest } from '../ventas/ventas.api';
 import type { CartItem } from './store.types';
 import { formatCurrency } from '../../lib/format';
+
+// Gancho pendiente: la Tienda de merchandising (etapa 11) todavia no tiene su
+// propio endpoint de checkout publico. El backend real de Ventas (channel
+// POS) que ya existe es exclusivo de Encargado/Dev desde el panel, no sirve
+// para este flujo anonimo - cuando se implemente la etapa 11, esto va a crear
+// un Sale con channel MERCH sin sellerId. No-op por ahora.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function reservarStockRequest(_articuloId: string, _cantidad: number): Promise<void> {
+  return undefined;
+}
 
 export function StorePage() {
   const [searchParams] = useSearchParams();
@@ -84,12 +93,7 @@ export function StorePage() {
     setConfirming(true);
     try {
       for (const item of cart) {
-        await crearVentaRequest({
-          articuloId: item.articuloId,
-          articuloNombre: item.nombre,
-          cantidad: item.cantidad,
-          precioUnitario: item.precio,
-        });
+        await reservarStockRequest(item.articuloId, item.cantidad);
       }
       setCart([]);
       setConfirmado(true);

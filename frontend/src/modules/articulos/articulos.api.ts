@@ -124,15 +124,3 @@ export async function crearMovimientoRequest(
   });
   return toArticulo(dto);
 }
-
-// Gancho pendiente: Ventas (todavia mock) y la reserva de Merch desde la
-// landing todavia no descuentan stock real - el modulo Turnos ya dejo
-// senalado este punto de integracion (ver MerchReservationHook en el backend)
-// y el prompt de Articulos/Stock explicitamente pide no implementar el
-// descuento automatico todavia. Ademas, Ventas es usado por los 3 roles (y la
-// tienda publica por anonimos), mientras que el endpoint real de movimientos
-// es Encargado/Dev - conectarlo ahi rompería esos flujos. No-op por ahora.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function adjustStockRequest(_articuloId: string, _delta: number): Promise<void> {
-  return undefined;
-}

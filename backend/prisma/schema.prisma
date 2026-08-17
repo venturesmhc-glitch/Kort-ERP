@@ -47,6 +47,7 @@ model User {
   workSchedules WorkSchedule[]
   appointments  Appointment[]
   cuts          Cut[]
+  sales         Sale[]
 
   @@map("users")
 }
@@ -62,6 +63,7 @@ model Client {
 
   appointments Appointment[]
   cuts         Cut[]
+  sales        Sale[]
 
   @@map("clients")
 }
@@ -115,19 +117,21 @@ model Appointment {
 // Modulo Registro de cortes. El precio es un snapshot copiado de
 // ParameterItem.price al momento del corte, no una referencia (ver Cut.price).
 model Cut {
-  id            String       @id @default(uuid())
+  id            String        @id @default(uuid())
   clientId      String
-  client        Client       @relation(fields: [clientId], references: [id])
+  client        Client        @relation(fields: [clientId], references: [id])
   barberoId     String
-  barbero       User         @relation(fields: [barberoId], references: [id])
+  barbero       User          @relation(fields: [barberoId], references: [id])
   tipoCorteId   String
   tipoCorte     ParameterItem @relation(fields: [tipoCorteId], references: [id])
   price         Int
   photoUrl      String?
-  appointmentId String?      @unique
-  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
-  cutAt         DateTime     @default(now())
-  createdAt     DateTime     @default(now())
+  appointmentId String?       @unique
+  appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
+  cutAt         DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+
+  treasuryEntry TreasuryEntry?
 
   @@map("cuts")
 }
@@ -135,38 +139,39 @@ model Cut {
 // Modulo Parametrizados: modelo generico (categoria + items) para que se puedan
 // sumar catalogos nuevos sin migracion. Ver skills.md #5.11 y #8.
 model ParameterCategory {
-  id          String    @id @default(uuid())
-  key         String    @unique
+  id          String          @id @default(uuid())
+  key         String          @unique
   name        String
   description String?
-  isSystem    Boolean   @default(false)
-  order       Int       @default(0)
+  isSystem    Boolean         @default(false)
+  order       Int             @default(0)
   deletedAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   items       ParameterItem[]
 
   @@map("parameter_categories")
 }
 
 model ParameterItem {
-  id          String            @id @default(uuid())
-  categoryId  String
-  category    ParameterCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  name        String
-  description String?
-  active      Boolean           @default(true)
-  order       Int               @default(0)
-  metadata    Json?
+  id              String            @id @default(uuid())
+  categoryId      String
+  category        ParameterCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name            String
+  description     String?
+  active          Boolean           @default(true)
+  order           Int               @default(0)
+  metadata        Json?
   // Precio del tipo de corte (solo lo usan los items de la categoria
   // "tipos-corte"; el resto de los catalogos lo ignora). Ver modulo Cortes.
-  price       Int?
-  deletedAt   DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  appointments Appointment[]
-  cuts         Cut[]
-  articles     Article[]
+  price           Int?
+  deletedAt       DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  appointments    Appointment[]
+  cuts            Cut[]
+  articles        Article[]
+  treasuryEntries TreasuryEntry[]
 
   @@unique([categoryId, name])
   @@map("parameter_items")
@@ -193,6 +198,7 @@ model Article {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   movements         StockMovement[]
+  saleItems         SaleItem[]
 
   @@map("articles")
 }
@@ -207,4 +213,84 @@ model StockMovement {
   createdAt DateTime          @default(now())
 
   @@map("stock_movements")
+}
+
+enum SaleChannel {
+  POS
+  MERCH
+}
+
+// Modulo Ventas: venta tipo carrito (Sale + SaleItem) para poder reutilizar el
+// mismo modelo desde el futuro checkout publico de merch (etapa 11), via
+// channel. sellerId es opcional porque ese checkout no tiene usuario logueado;
+// las ventas del panel (channel POS) siempre lo llevan. El precio de cada item
+// es un snapshot (SaleItem.unitPrice), igual que Cut.price.
+model Sale {
+  id          String      @id @default(uuid())
+  channel     SaleChannel @default(POS)
+  clientId    String?
+  client      Client?     @relation(fields: [clientId], references: [id])
+  sellerId    String?
+  seller      User?       @relation(fields: [sellerId], references: [id])
+  totalAmount Int
+  createdAt   DateTime    @default(now())
+
+  items         SaleItem[]
+  treasuryEntry TreasuryEntry?
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id        String  @id @default(uuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id])
+  quantity  Int
+  unitPrice Int
+  subtotal  Int
+
+  @@map("sale_items")
+}
+
+enum TreasuryEntryType {
+  INCOME
+  EXPENSE
+}
+
+enum TreasuryExpenseKind {
+  FIXED
+  VARIABLE
+}
+
+enum TreasuryEntrySource {
+  MANUAL
+  CUT
+  SALE
+}
+
+// Modulo Tesoreria: ledger unico de costos e ingresos, en vez de tablas
+// separadas, para que historico y graficos recorran una sola fuente.
+// expenseKind solo aplica cuando type = EXPENSE (costo fijo/variable).
+// source distingue carga manual de los ingresos automaticos generados por
+// Cortes/Ventas (cutId/saleId), ver TreasuryService.
+model TreasuryEntry {
+  id              String               @id @default(uuid())
+  type            TreasuryEntryType
+  expenseKind     TreasuryExpenseKind?
+  categoryId      String
+  category        ParameterItem        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  amount          Int
+  description     String?
+  entryDate       DateTime
+  source          TreasuryEntrySource  @default(MANUAL)
+  cutId           String?              @unique
+  cut             Cut?                 @relation(fields: [cutId], references: [id])
+  saleId          String?              @unique
+  sale            Sale?                @relation(fields: [saleId], references: [id])
+  createdByUserId String?
+  createdAt       DateTime             @default(now())
+
+  @@map("treasury_entries")
 }

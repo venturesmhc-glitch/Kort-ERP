@@ -13,6 +13,8 @@ import {
 } from './modules/appointments/appointments.routes.js';
 import { cutsRouter } from './modules/cuts/cuts.routes.js';
 import { articlesRouter, publicArticlesRouter } from './modules/articles/articles.routes.js';
+import { salesRouter } from './modules/sales/sales.routes.js';
+import { treasuryRouter } from './modules/treasury/treasury.routes.js';
 
 export const app = express();
 
@@ -35,8 +37,10 @@ app.use('/api/public/appointments', publicAppointmentsRouter);
 app.use('/api/cuts', cutsRouter);
 app.use('/api/articles', articlesRouter);
 app.use('/api/public/articles', publicArticlesRouter);
+app.use('/api/sales', salesRouter);
+app.use('/api/treasury', treasuryRouter);
 
-// Modulos futuros (dashboard, sales, treasury, workshifts, stats, settings,
-// merch) se montan aca a medida que se implementen.
+// Modulos futuros (dashboard, workshifts, stats, settings, merch) se montan
+// aca a medida que se implementen.
 
 app.use(errorHandler);

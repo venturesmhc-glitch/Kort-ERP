@@ -1,75 +1,115 @@
-import { createMockCollection } from '../../lib/mockStore';
-import type { Movimiento, MovimientoInput } from './tesoreria.types';
-import { todayIso } from '../../lib/format';
+import { apiRequest } from '../../lib/apiClient';
+import type { Movimiento, MovimientoSource, MovimientoTipoUI } from './tesoreria.types';
+import type { MovimientoFormValues } from './tesoreria.schema';
 
-const seed: Movimiento[] = [
-  {
-    id: 'seed-1',
-    tipo: 'costo_fijo',
-    categoriaId: 'costo-alquiler',
-    categoriaNombre: 'Alquiler',
-    monto: 250000,
-    fecha: '2026-08-01',
-    descripcion: 'Alquiler del local',
-  },
-  {
-    id: 'seed-2',
-    tipo: 'costo_fijo',
-    categoriaId: 'costo-sueldos',
-    categoriaNombre: 'Sueldos',
-    monto: 480000,
-    fecha: '2026-08-01',
-  },
-  {
-    id: 'seed-3',
-    tipo: 'costo_variable',
-    categoriaId: 'costo-insumos',
-    categoriaNombre: 'Insumos',
-    monto: 35000,
-    fecha: '2026-08-05',
-  },
-  {
-    id: 'seed-4',
-    tipo: 'ingreso',
-    categoriaId: 'ingreso-cortes',
-    categoriaNombre: 'Cortes',
-    monto: 180000,
-    fecha: '2026-08-10',
-  },
-  {
-    id: 'seed-5',
-    tipo: 'ingreso',
-    categoriaId: 'ingreso-merchandising',
-    categoriaNombre: 'Ventas merchandising',
-    monto: 42000,
-    fecha: '2026-08-12',
-  },
-];
-
-const collection = createMockCollection<Movimiento>('tesoreria-movimientos', seed);
-
-export const listMovimientosRequest = () => collection.list();
-export const createMovimientoRequest = (input: MovimientoInput) => collection.create(input);
-export const deleteMovimientoRequest = (id: string) => collection.remove(id);
-
-export async function registrarIngresoVentaRequest(monto: number, descripcion: string) {
-  return collection.create({
-    tipo: 'ingreso',
-    categoriaId: 'ingreso-merchandising',
-    categoriaNombre: 'Ventas merchandising',
-    monto,
-    fecha: todayIso(),
-    descripcion,
-  });
+interface EntryDto {
+  id: string;
+  type: 'INCOME' | 'EXPENSE';
+  expenseKind: 'FIXED' | 'VARIABLE' | null;
+  categoryId: string;
+  category: { id: string; name: string };
+  amount: number;
+  description: string | null;
+  entryDate: string;
+  source: MovimientoSource;
 }
 
-export async function registrarIngresoCorteRequest(monto: number, descripcion: string) {
-  return collection.create({
-    tipo: 'ingreso',
-    categoriaId: 'ingreso-cortes',
-    categoriaNombre: 'Cortes',
-    monto,
-    fecha: todayIso(),
-    descripcion,
+function toTipoUI(dto: EntryDto): MovimientoTipoUI {
+  if (dto.type === 'INCOME') return 'ingreso';
+  return dto.expenseKind === 'FIXED' ? 'costo_fijo' : 'costo_variable';
+}
+
+function fromTipoUI(tipo: MovimientoTipoUI) {
+  if (tipo === 'ingreso') {
+    return { type: 'INCOME' as const, expenseKind: undefined };
+  }
+  return {
+    type: 'EXPENSE' as const,
+    expenseKind: tipo === 'costo_fijo' ? ('FIXED' as const) : ('VARIABLE' as const),
+  };
+}
+
+function toMovimiento(dto: EntryDto): Movimiento {
+  return {
+    id: dto.id,
+    tipoUI: toTipoUI(dto),
+    categoriaId: dto.categoryId,
+    categoriaNombre: dto.category.name,
+    monto: dto.amount,
+    fecha: dto.entryDate,
+    descripcion: dto.description ?? undefined,
+    source: dto.source,
+  };
+}
+
+export interface ListMovimientosFiltros {
+  fechaDesde?: string;
+  fechaHasta?: string;
+  tipo?: MovimientoTipoUI;
+  categoriaId?: string;
+}
+
+export async function listMovimientosRequest(filtros: ListMovimientosFiltros = {}): Promise<Movimiento[]> {
+  const params = new URLSearchParams();
+  if (filtros.fechaDesde) params.set('dateFrom', filtros.fechaDesde);
+  if (filtros.fechaHasta) params.set('dateTo', filtros.fechaHasta);
+  if (filtros.categoriaId) params.set('categoryId', filtros.categoriaId);
+  if (filtros.tipo) {
+    params.set('type', fromTipoUI(filtros.tipo).type);
+  }
+  const query = params.toString();
+  const dtos = await apiRequest<EntryDto[]>(`/treasury/entries${query ? `?${query}` : ''}`);
+  return dtos.map(toMovimiento);
+}
+
+export async function createMovimientoRequest(input: MovimientoFormValues): Promise<Movimiento> {
+  const { type, expenseKind } = fromTipoUI(input.tipo);
+  const dto = await apiRequest<EntryDto>('/treasury/entries', {
+    method: 'POST',
+    body: {
+      type,
+      expenseKind,
+      categoryId: input.categoriaId,
+      amount: input.monto,
+      description: input.descripcion || undefined,
+      entryDate: input.fecha,
+    },
   });
+  return toMovimiento(dto);
+}
+
+export function deleteMovimientoRequest(id: string): Promise<void> {
+  return apiRequest<void>(`/treasury/entries/${id}`, { method: 'DELETE' });
+}
+
+export interface TreasurySummary {
+  from: string;
+  to: string;
+  totals: {
+    income: number;
+    fixedCosts: number;
+    variableCosts: number;
+    totalCosts: number;
+    result: number;
+  };
+  breakeven: {
+    contributionMarginRatio: number | null;
+    breakevenRevenue: number | null;
+    reachedAt: string | null;
+  };
+  categoryBreakdown: { categoryId: string; categoryName: string; type: 'INCOME' | 'EXPENSE'; total: number }[];
+  series: { date: string; cumulativeIncome: number; cumulativeCosts: number }[];
+}
+
+export interface SummaryFiltros {
+  fechaDesde?: string;
+  fechaHasta?: string;
+}
+
+export function getResumenRequest(filtros: SummaryFiltros = {}): Promise<TreasurySummary> {
+  const params = new URLSearchParams();
+  if (filtros.fechaDesde) params.set('dateFrom', filtros.fechaDesde);
+  if (filtros.fechaHasta) params.set('dateTo', filtros.fechaHasta);
+  const query = params.toString();
+  return apiRequest<TreasurySummary>(`/treasury/summary${query ? `?${query}` : ''}`);
 }

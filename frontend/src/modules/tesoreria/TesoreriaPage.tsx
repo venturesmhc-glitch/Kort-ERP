@@ -1,51 +1,70 @@
 import { useEffect, useState } from 'react';
-import { createMovimientoRequest, deleteMovimientoRequest, listMovimientosRequest } from './tesoreria.api';
+import {
+  createMovimientoRequest,
+  deleteMovimientoRequest,
+  getResumenRequest,
+  listMovimientosRequest,
+  type ListMovimientosFiltros,
+  type TreasurySummary,
+} from './tesoreria.api';
 import { MovimientoForm } from './MovimientoForm';
-import { MOVIMIENTO_TIPO_LABELS, type Movimiento } from './tesoreria.types';
+import { MOVIMIENTO_SOURCE_LABELS, MOVIMIENTO_TIPO_LABELS, type Movimiento, type MovimientoTipoUI } from './tesoreria.types';
 import type { MovimientoFormValues } from './tesoreria.schema';
 import { BarChart } from '../../components/BarChart';
-import { formatCurrency, formatDate } from '../../lib/format';
+import { formatCurrency, formatDate, todayIso, toLocalIso } from '../../lib/format';
+
+function inicioDeMes() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+}
 
 export function TesoreriaPage() {
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
+  const [resumen, setResumen] = useState<TreasurySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [filtros, setFiltros] = useState<ListMovimientosFiltros>({
+    fechaDesde: inicioDeMes(),
+    fechaHasta: todayIso(),
+  });
 
-  async function loadMovimientos() {
+  async function loadAll(activeFiltros: ListMovimientosFiltros) {
     setLoading(true);
     try {
-      setMovimientos(await listMovimientosRequest());
+      const [movs, res] = await Promise.all([
+        listMovimientosRequest(activeFiltros),
+        getResumenRequest({ fechaDesde: activeFiltros.fechaDesde, fechaHasta: activeFiltros.fechaHasta }),
+      ]);
+      setMovimientos(movs);
+      setResumen(res);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadMovimientos();
+    loadAll(filtros);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleCreate(values: MovimientoFormValues) {
     await createMovimientoRequest(values);
     setShowForm(false);
-    await loadMovimientos();
+    await loadAll(filtros);
   }
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este movimiento?')) return;
     await deleteMovimientoRequest(id);
-    await loadMovimientos();
+    await loadAll(filtros);
   }
 
-  const costosFijos = movimientos
-    .filter((m) => m.tipo === 'costo_fijo')
-    .reduce((sum, m) => sum + m.monto, 0);
-  const costosVariables = movimientos
-    .filter((m) => m.tipo === 'costo_variable')
-    .reduce((sum, m) => sum + m.monto, 0);
-  const ingresos = movimientos.filter((m) => m.tipo === 'ingreso').reduce((sum, m) => sum + m.monto, 0);
+  function handleFiltrar() {
+    loadAll(filtros);
+  }
 
-  const margenContribucion = ingresos > 0 ? 1 - costosVariables / ingresos : 0;
-  const puntoEquilibrio = margenContribucion > 0 ? costosFijos / margenContribucion : costosFijos;
+  const totals = resumen?.totals;
+  const breakeven = resumen?.breakeven;
 
   return (
     <div>
@@ -60,82 +79,151 @@ export function TesoreriaPage() {
 
       {showForm && <MovimientoForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />}
 
-      <div className="stat-row">
-        <div className="stat-tile">
-          <span className="stat-label">Ingresos</span>
-          <span className="stat-value">{formatCurrency(ingresos)}</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-label">Costos fijos</span>
-          <span className="stat-value">{formatCurrency(costosFijos)}</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-label">Costos variables</span>
-          <span className="stat-value">{formatCurrency(costosVariables)}</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-label">Resultado</span>
-          <span className="stat-value">{formatCurrency(ingresos - costosFijos - costosVariables)}</span>
-        </div>
-      </div>
-
-      <div className="card">
-        <h2>Punto de equilibrio</h2>
-        <p className="text-muted">
-          Ingreso minimo estimado para no estar en perdida:{' '}
-          <strong>{formatCurrency(puntoEquilibrio)}</strong>. Calculo simplificado con los
-          movimientos cargados (placeholder, a definir formula exacta con el cliente).
-        </p>
-        <BarChart
-          data={[
-            { label: 'Ingresos', value: ingresos },
-            { label: 'Punto eq.', value: puntoEquilibrio },
-            { label: 'Costos fijos', value: costosFijos },
-            { label: 'Costos var.', value: costosVariables },
-          ]}
-          formatValue={formatCurrency}
+      <div className="client-form" style={{ marginBottom: '1rem' }}>
+        <label htmlFor="fechaDesde">Desde</label>
+        <input
+          id="fechaDesde"
+          type="date"
+          value={filtros.fechaDesde ?? ''}
+          onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value || undefined }))}
         />
+        <label htmlFor="fechaHasta">Hasta</label>
+        <input
+          id="fechaHasta"
+          type="date"
+          value={filtros.fechaHasta ?? ''}
+          onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value || undefined }))}
+        />
+        <label htmlFor="tipoFiltro">Tipo</label>
+        <select
+          id="tipoFiltro"
+          value={filtros.tipo ?? ''}
+          onChange={(e) =>
+            setFiltros((prev) => ({
+              ...prev,
+              tipo: (e.target.value || undefined) as MovimientoTipoUI | undefined,
+            }))
+          }
+        >
+          <option value="">Todos</option>
+          {Object.entries(MOVIMIENTO_TIPO_LABELS).map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <button type="button" onClick={handleFiltrar}>
+          Filtrar
+        </button>
       </div>
 
-      <h2>Historico de movimientos</h2>
-      {loading ? (
+      {loading || !totals || !breakeven ? (
         <p>Cargando...</p>
       ) : (
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Tipo</th>
-                <th>Categoria</th>
-                <th>Descripcion</th>
-                <th>Monto</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {movimientos.map((m) => (
-                <tr key={m.id}>
-                  <td>{formatDate(m.fecha)}</td>
-                  <td>{MOVIMIENTO_TIPO_LABELS[m.tipo]}</td>
-                  <td>{m.categoriaNombre}</td>
-                  <td>{m.descripcion ?? '-'}</td>
-                  <td>{formatCurrency(m.monto)}</td>
-                  <td className="data-table-actions">
-                    <button type="button" onClick={() => handleDelete(m.id)}>
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {movimientos.length === 0 && (
+        <>
+          <div className="stat-row">
+            <div className="stat-tile">
+              <span className="stat-label">Ingresos</span>
+              <span className="stat-value">{formatCurrency(totals.income)}</span>
+            </div>
+            <div className="stat-tile">
+              <span className="stat-label">Costos fijos</span>
+              <span className="stat-value">{formatCurrency(totals.fixedCosts)}</span>
+            </div>
+            <div className="stat-tile">
+              <span className="stat-label">Costos variables</span>
+              <span className="stat-value">{formatCurrency(totals.variableCosts)}</span>
+            </div>
+            <div className="stat-tile">
+              <span className="stat-label">Resultado</span>
+              <span className="stat-value">{formatCurrency(totals.result)}</span>
+            </div>
+          </div>
+
+          <div className="card">
+            <h2>Punto de equilibrio</h2>
+            {breakeven.breakevenRevenue !== null ? (
+              <p className="text-muted">
+                Ingreso minimo estimado para no estar en perdida en el periodo:{' '}
+                <strong>{formatCurrency(breakeven.breakevenRevenue)}</strong> (margen de contribucion
+                aproximado: {((breakeven.contributionMarginRatio ?? 0) * 100).toFixed(1)}%).
+              </p>
+            ) : (
+              <p className="text-muted">
+                Con los costos variables cargados en el periodo, el margen de contribucion es nulo o
+                negativo - no hay un ingreso objetivo finito. Revisa la carga de costos variables.
+              </p>
+            )}
+            <p className="text-muted">
+              Calculo aproximado sobre los movimientos del periodo (no hay costo real por
+              articulo/corte todavia): asume que el costo variable escala con el ingreso.
+              {breakeven.reachedAt
+                ? ` El acumulado del periodo paso a favor el ${formatDate(breakeven.reachedAt)}.`
+                : ' Los ingresos acumulados todavia no superaron a los costos acumulados en este periodo.'}
+            </p>
+            <BarChart
+              data={[
+                { label: 'Ingresos', value: totals.income },
+                { label: 'Punto eq.', value: breakeven.breakevenRevenue ?? 0 },
+                { label: 'Costos fijos', value: totals.fixedCosts },
+                { label: 'Costos var.', value: totals.variableCosts },
+              ]}
+              formatValue={formatCurrency}
+            />
+          </div>
+
+          {resumen.categoryBreakdown.length > 0 && (
+            <div className="card">
+              <h2>Por categoria</h2>
+              <BarChart
+                data={resumen.categoryBreakdown.map((c) => ({ label: c.categoryName, value: c.total }))}
+                color="var(--color-accent)"
+                formatValue={formatCurrency}
+              />
+            </div>
+          )}
+
+          <h2>Historico de movimientos</h2>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan={6}>No hay movimientos cargados todavia.</td>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th>Categoria</th>
+                  <th>Descripcion</th>
+                  <th>Origen</th>
+                  <th>Monto</th>
+                  <th></th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {movimientos.map((m) => (
+                  <tr key={m.id}>
+                    <td>{formatDate(toLocalIso(new Date(m.fecha)))}</td>
+                    <td>{MOVIMIENTO_TIPO_LABELS[m.tipoUI]}</td>
+                    <td>{m.categoriaNombre}</td>
+                    <td>{m.descripcion ?? '-'}</td>
+                    <td>{MOVIMIENTO_SOURCE_LABELS[m.source]}</td>
+                    <td>{formatCurrency(m.monto)}</td>
+                    <td className="data-table-actions">
+                      {m.source === 'MANUAL' && (
+                        <button type="button" onClick={() => handleDelete(m.id)}>
+                          Eliminar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {movimientos.length === 0 && (
+                  <tr>
+                    <td colSpan={7}>No hay movimientos cargados todavia.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

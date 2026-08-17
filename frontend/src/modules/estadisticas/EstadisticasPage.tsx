@@ -37,14 +37,16 @@ export function EstadisticasPage() {
 
       const ventasMap = new Map<string, number>();
       ventas.forEach((v) =>
-        ventasMap.set(v.articuloNombre, (ventasMap.get(v.articuloNombre) ?? 0) + v.total)
+        v.items.forEach((item) =>
+          ventasMap.set(item.articuloNombre, (ventasMap.get(item.articuloNombre) ?? 0) + item.subtotal)
+        )
       );
       setVentasPorArticulo([...ventasMap.entries()].map(([label, value]) => ({ label, value })));
 
       setTotalCortes(cortes.length);
       setTotalVentas(ventas.length);
       setTotalIngresos(
-        movimientos.filter((m) => m.tipo === 'ingreso').reduce((sum, m) => sum + m.monto, 0)
+        movimientos.filter((m) => m.tipoUI === 'ingreso').reduce((sum, m) => sum + m.monto, 0)
       );
       setLoading(false);
     }
