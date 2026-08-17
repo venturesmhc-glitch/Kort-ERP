@@ -1,63 +1,60 @@
 import { useEffect, useState } from 'react';
-import { listCortesRequest } from '../cortes/cortes.api';
-import { listVentasRequest } from '../ventas/ventas.api';
-import { listClientsRequest } from '../clients/clients.api';
-import { listMovimientosRequest } from '../tesoreria/tesoreria.api';
+import {
+  getBarberStatsRequest,
+  getClientStatsRequest,
+  getCutStatsRequest,
+  getSaleStatsRequest,
+  type StatsFiltros,
+} from './estadisticas.api';
+import type { BarberStat, ClientStats, CutStats, SaleStats } from './estadisticas.types';
 import { BarChart } from '../../components/BarChart';
-import { formatCurrency } from '../../lib/format';
+import { formatCurrency, todayIso } from '../../lib/format';
 
-interface Datum {
-  label: string;
-  value: number;
+function inicioDeMes() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function formatDiaCorto(iso: string) {
+  const [, month, day] = iso.split('-');
+  return `${day}/${month}`;
 }
 
 export function EstadisticasPage() {
   const [loading, setLoading] = useState(true);
-  const [cortesPorBarbero, setCortesPorBarbero] = useState<Datum[]>([]);
-  const [ventasPorArticulo, setVentasPorArticulo] = useState<Datum[]>([]);
-  const [totalClientes, setTotalClientes] = useState(0);
-  const [totalIngresos, setTotalIngresos] = useState(0);
-  const [totalCortes, setTotalCortes] = useState(0);
-  const [totalVentas, setTotalVentas] = useState(0);
+  const [clientStats, setClientStats] = useState<ClientStats | null>(null);
+  const [barberStats, setBarberStats] = useState<BarberStat[]>([]);
+  const [cutStats, setCutStats] = useState<CutStats | null>(null);
+  const [saleStats, setSaleStats] = useState<SaleStats | null>(null);
+  const [filtros, setFiltros] = useState<StatsFiltros>({
+    fechaDesde: inicioDeMes(),
+    fechaHasta: todayIso(),
+  });
 
-  useEffect(() => {
-    // Cada fuente se resuelve por separado: si el backend real de Clientes
-    // todavia no esta levantado, las estadisticas basadas en datos mock
-    // (cortes, ventas, tesoreria) igual se muestran.
-    async function load() {
-      const [cortes, ventas, movimientos] = await Promise.all([
-        listCortesRequest(),
-        listVentasRequest(),
-        listMovimientosRequest(),
+  async function load(activeFiltros: StatsFiltros) {
+    setLoading(true);
+    try {
+      const [clients, barbers, cuts, sales] = await Promise.all([
+        getClientStatsRequest(activeFiltros),
+        getBarberStatsRequest(activeFiltros),
+        getCutStatsRequest(activeFiltros),
+        getSaleStatsRequest(activeFiltros),
       ]);
-
-      const cortesMap = new Map<string, number>();
-      cortes.forEach((c) => cortesMap.set(c.barberoNombre, (cortesMap.get(c.barberoNombre) ?? 0) + 1));
-      setCortesPorBarbero([...cortesMap.entries()].map(([label, value]) => ({ label, value })));
-
-      const ventasMap = new Map<string, number>();
-      ventas.forEach((v) =>
-        v.items.forEach((item) =>
-          ventasMap.set(item.articuloNombre, (ventasMap.get(item.articuloNombre) ?? 0) + item.subtotal)
-        )
-      );
-      setVentasPorArticulo([...ventasMap.entries()].map(([label, value]) => ({ label, value })));
-
-      setTotalCortes(cortes.length);
-      setTotalVentas(ventas.length);
-      setTotalIngresos(
-        movimientos.filter((m) => m.tipoUI === 'ingreso').reduce((sum, m) => sum + m.monto, 0)
-      );
+      setClientStats(clients);
+      setBarberStats(barbers);
+      setCutStats(cuts);
+      setSaleStats(sales);
+    } finally {
       setLoading(false);
     }
-    load();
+  }
 
-    listClientsRequest()
-      .then((clients) => setTotalClientes(clients.length))
-      .catch(() => setTotalClientes(0));
+  useEffect(() => {
+    load(filtros);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) {
+  if (loading || !clientStats || !cutStats || !saleStats) {
     return <p>Cargando...</p>;
   }
 
@@ -67,42 +64,154 @@ export function EstadisticasPage() {
         <h1>Centro de estadisticas</h1>
       </div>
 
+      <div className="client-form" style={{ marginBottom: '1rem' }}>
+        <label htmlFor="fechaDesde">Desde</label>
+        <input
+          id="fechaDesde"
+          type="date"
+          value={filtros.fechaDesde ?? ''}
+          onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value || undefined }))}
+        />
+        <label htmlFor="fechaHasta">Hasta</label>
+        <input
+          id="fechaHasta"
+          type="date"
+          value={filtros.fechaHasta ?? ''}
+          onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value || undefined }))}
+        />
+        <button type="button" onClick={() => load(filtros)}>
+          Filtrar
+        </button>
+      </div>
+
       <div className="stat-row">
         <div className="stat-tile">
-          <span className="stat-label">Clientes</span>
-          <span className="stat-value">{totalClientes}</span>
+          <span className="stat-label">Altas de clientes</span>
+          <span className="stat-value">{clientStats.totalAltas}</span>
         </div>
         <div className="stat-tile">
           <span className="stat-label">Cortes registrados</span>
-          <span className="stat-value">{totalCortes}</span>
+          <span className="stat-value">{cutStats.totalCortes}</span>
         </div>
         <div className="stat-tile">
-          <span className="stat-label">Ventas registradas</span>
-          <span className="stat-value">{totalVentas}</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-label">Ingresos totales</span>
-          <span className="stat-value">{formatCurrency(totalIngresos)}</span>
+          <span className="stat-label">Ventas totales</span>
+          <span className="stat-value">{formatCurrency(saleStats.totalVentas)}</span>
         </div>
       </div>
 
       <div className="card-grid">
         <div className="card">
-          <h2>Cortes por barbero</h2>
-          {cortesPorBarbero.length > 0 ? (
-            <BarChart data={cortesPorBarbero} />
+          <h2>Altas de clientes por dia</h2>
+          {clientStats.altasPorDia.length > 0 ? (
+            <BarChart
+              data={clientStats.altasPorDia.map((d) => ({ label: formatDiaCorto(d.date), value: d.count }))}
+            />
+          ) : (
+            <p className="text-muted">No hay altas en el periodo.</p>
+          )}
+        </div>
+
+        <div className="card">
+          <h2>Clientes nuevos vs. recurrentes</h2>
+          <p className="text-muted">Entre los clientes con al menos un corte en el periodo.</p>
+          <BarChart
+            data={[
+              { label: 'Nuevos', value: clientStats.nuevosVsRecurrentes.nuevos },
+              { label: 'Recurrentes', value: clientStats.nuevosVsRecurrentes.recurrentes },
+            ]}
+            color="var(--color-accent)"
+          />
+        </div>
+
+        <div className="card">
+          <h2>Cortes por tipo</h2>
+          {cutStats.porTipo.length > 0 ? (
+            <BarChart
+              data={cutStats.porTipo.map((t) => ({ label: t.tipoCorteNombre, value: t.cantidad }))}
+            />
           ) : (
             <p className="text-muted">Todavia no hay cortes registrados.</p>
           )}
         </div>
+
+        <div className="card">
+          <h2>Evolucion de cortes</h2>
+          {cutStats.evolucion.length > 0 ? (
+            <BarChart
+              data={cutStats.evolucion.map((e) => ({ label: formatDiaCorto(e.date), value: e.cantidad }))}
+              color="var(--color-accent)"
+            />
+          ) : (
+            <p className="text-muted">Todavia no hay cortes registrados.</p>
+          )}
+        </div>
+
         <div className="card">
           <h2>Ventas por articulo</h2>
-          {ventasPorArticulo.length > 0 ? (
-            <BarChart data={ventasPorArticulo} color="var(--color-accent)" formatValue={formatCurrency} />
+          {saleStats.porArticulo.length > 0 ? (
+            <BarChart
+              data={saleStats.porArticulo.map((a) => ({ label: a.articleNombre, value: a.total }))}
+              color="var(--color-accent)"
+              formatValue={formatCurrency}
+            />
           ) : (
             <p className="text-muted">Todavia no hay ventas registradas.</p>
           )}
         </div>
+
+        <div className="card">
+          <h2>Ventas por categoria de producto</h2>
+          {saleStats.porCategoria.length > 0 ? (
+            <BarChart
+              data={saleStats.porCategoria.map((c) => ({ label: c.categoriaNombre, value: c.total }))}
+              formatValue={formatCurrency}
+            />
+          ) : (
+            <p className="text-muted">Todavia no hay ventas registradas.</p>
+          )}
+        </div>
+
+        <div className="card">
+          <h2>Ventas por dia</h2>
+          {saleStats.serieDiaria.length > 0 ? (
+            <BarChart
+              data={saleStats.serieDiaria.map((s) => ({ label: formatDiaCorto(s.date), value: s.total }))}
+              color="var(--color-accent)"
+              formatValue={formatCurrency}
+            />
+          ) : (
+            <p className="text-muted">Todavia no hay ventas registradas.</p>
+          )}
+        </div>
+      </div>
+
+      <h2>Barberos</h2>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Barbero</th>
+              <th>Cortes realizados</th>
+              <th>Ventas generadas</th>
+              <th>Horas trabajadas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {barberStats.map((b) => (
+              <tr key={b.barberoId}>
+                <td>{b.barberoNombre}</td>
+                <td>{b.cortesRealizados}</td>
+                <td>{formatCurrency(b.ventasGeneradas)}</td>
+                <td>{b.horasTrabajadas.toFixed(1)} hs</td>
+              </tr>
+            ))}
+            {barberStats.length === 0 && (
+              <tr>
+                <td colSpan={4}>No hay actividad de barberos en el periodo.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

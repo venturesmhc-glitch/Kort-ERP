@@ -66,6 +66,7 @@ model Client {
   cuts         Cut[]
   sales        Sale[]
 
+  @@index([createdAt])
   @@map("clients")
 }
 
@@ -134,6 +135,7 @@ model Cut {
 
   treasuryEntry TreasuryEntry?
 
+  @@index([cutAt])
   @@map("cuts")
 }
 
@@ -239,6 +241,7 @@ model Sale {
   items         SaleItem[]
   treasuryEntry TreasuryEntry?
 
+  @@index([createdAt])
   @@map("sales")
 }
 
