@@ -7,7 +7,9 @@
     "seed": "tsx prisma/seed.ts"
   },
   "scripts": {
+    "predev": "tsc -p ../packages/shared/tsconfig.json",
     "dev": "tsx watch src/server.ts",
+    "prebuild": "tsc -p ../packages/shared/tsconfig.json",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "lint": "eslint .",
