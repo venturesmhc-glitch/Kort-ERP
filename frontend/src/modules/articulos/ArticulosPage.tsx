@@ -12,18 +12,23 @@ import { StockMovementForm } from './StockMovementForm';
 import type { Articulo } from './articulos.types';
 import type { ArticuloFormValues, MovimientoFormValues } from './articulos.schema';
 import { formatCurrency } from '../../lib/format';
+import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 export function ArticulosPage() {
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [editingArticulo, setEditingArticulo] = useState<Articulo | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [movementArticulo, setMovementArticulo] = useState<Articulo | null>(null);
 
   async function loadArticulos() {
     setLoading(true);
+    setError(null);
     try {
       setArticulos(await listArticulosRequest());
+    } catch (err) {
+      setError(toErrorMessage(err, 'No se pudieron cargar los articulos.'));
     } finally {
       setLoading(false);
     }
@@ -103,7 +108,9 @@ export function ArticulosPage() {
       )}
 
       {loading ? (
-        <p>Cargando...</p>
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} />
       ) : (
         <div className="table-wrap">
           <table className="data-table">
@@ -156,7 +163,9 @@ export function ArticulosPage() {
               ))}
               {articulos.length === 0 && (
                 <tr>
-                  <td colSpan={6}>No hay articulos cargados todavia.</td>
+                  <td colSpan={6}>
+                    <EmptyState message="No hay articulos cargados todavia." />
+                  </td>
                 </tr>
               )}
             </tbody>

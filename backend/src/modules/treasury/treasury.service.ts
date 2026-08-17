@@ -191,16 +191,17 @@ async function recordIncome(
   amount: number,
   source: 'CUT' | 'SALE',
   linkId: { cutId?: string; saleId?: string }
-) {
+): Promise<string | undefined> {
   try {
     const category = await prisma.parameterItem.findFirst({
       where: { category: { key: 'categorias-ingresos' }, name: type.name, deletedAt: null },
     });
     if (!category) {
-      console.error(
-        `[TreasuryService] No se encontro la categoria de ingresos "${type.name}" - no se registro el movimiento`
-      );
-      return;
+      const warning = `No se encontro la categoria de ingresos "${type.name}" en Parametrizados: el ${
+        source === 'CUT' ? 'corte' : 'la venta'
+      } se guardo pero no genero movimiento en Tesoreria.`;
+      console.error(`[TreasuryService] ${warning}`);
+      return warning;
     }
 
     await prisma.treasuryEntry.create({
@@ -214,8 +215,10 @@ async function recordIncome(
         ...linkId,
       },
     });
+    return undefined;
   } catch (error) {
     console.error(`[TreasuryService] Error registrando ingreso automatico (${source})`, error);
+    return 'Ocurrio un error registrando el ingreso en Tesoreria. Revisalo manualmente.';
   }
 }
 
@@ -225,6 +228,7 @@ async function recordIncome(
 // errores para no tumbar esa respuesta por un problema de Tesoreria (ej.
 // categoria de ingresos borrada) - el corte/venta ya quedo guardado.
 export const TreasuryService = {
+  /** Devuelve un mensaje de warning si no se pudo registrar el ingreso, o undefined si salio bien. */
   recordIncomeFromCut(cut: { id: string; price: number }) {
     return recordIncome(
       { name: 'Cortes', description: `Ingreso por corte ${cut.id}` },

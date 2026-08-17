@@ -77,9 +77,9 @@ export async function createCut(input: CreateCutInput, user: AuthUser) {
       return created;
     });
 
-    await TreasuryService.recordIncomeFromCut(cut);
+    const treasuryWarning = await TreasuryService.recordIncomeFromCut(cut);
 
-    return cut;
+    return treasuryWarning ? { ...cut, treasuryWarning } : cut;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       throw new ConflictError('Ese turno ya tiene un corte registrado');
@@ -101,5 +101,12 @@ export async function deleteCut(id: string) {
   if (!cut) {
     throw new NotFoundError('Corte no encontrado');
   }
-  await prisma.cut.delete({ where: { id } });
+  // La FK de treasury_entries.cutId es ON DELETE SET NULL: sin este paso el
+  // ingreso automatico del corte queda huerfano (desvinculado pero sumando
+  // igual en Tesoreria). Lo borramos junto con el corte para que no se
+  // infle el total de ingresos con movimientos que ya no tienen origen.
+  await prisma.$transaction([
+    prisma.treasuryEntry.deleteMany({ where: { cutId: id, source: 'CUT' } }),
+    prisma.cut.delete({ where: { id } }),
+  ]);
 }

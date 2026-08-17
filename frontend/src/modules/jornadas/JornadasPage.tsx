@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { listJornadasRequest, type ListJornadasFiltros } from './jornadas.api';
 import type { Jornada } from './jornadas.types';
 import { formatDate, todayIso } from '../../lib/format';
+import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 function inicioDeMes() {
   const now = new Date();
@@ -15,6 +16,7 @@ function formatHora(iso: string) {
 export function JornadasPage() {
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filtros, setFiltros] = useState<ListJornadasFiltros>({
     fechaDesde: inicioDeMes(),
     fechaHasta: todayIso(),
@@ -22,9 +24,12 @@ export function JornadasPage() {
 
   async function load(activeFiltros: ListJornadasFiltros) {
     setLoading(true);
+    setError(null);
     try {
       const data = await listJornadasRequest(activeFiltros);
       setJornadas(data);
+    } catch (err) {
+      setError(toErrorMessage(err, 'No se pudieron cargar las jornadas.'));
     } finally {
       setLoading(false);
     }
@@ -80,7 +85,9 @@ export function JornadasPage() {
       </div>
 
       {loading ? (
-        <p>Cargando...</p>
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} />
       ) : (
         <div className="table-wrap">
           <table className="data-table">
@@ -107,7 +114,9 @@ export function JornadasPage() {
               ))}
               {jornadas.length === 0 && (
                 <tr>
-                  <td colSpan={6}>No hay jornadas registradas en el periodo.</td>
+                  <td colSpan={6}>
+                    <EmptyState message="No hay jornadas registradas en el periodo." />
+                  </td>
                 </tr>
               )}
             </tbody>

@@ -20,6 +20,7 @@ import {
 } from './turnos.types';
 import { formatDate } from '../../lib/format';
 import { useAuth } from '../auth/AuthContext';
+import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 type Tab = 'agenda' | 'horarios';
 
@@ -31,6 +32,7 @@ export function TurnosPage() {
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingHorario, setEditingHorario] = useState<Horario | null>(null);
   const [slotMinutos, setSlotMinutos] = useState<number | null>(null);
@@ -38,6 +40,7 @@ export function TurnosPage() {
 
   async function loadAll() {
     setLoading(true);
+    setError(null);
     try {
       const [turnosData, horariosData, settings] = await Promise.all([
         listTurnosRequest(),
@@ -47,6 +50,8 @@ export function TurnosPage() {
       setTurnos([...turnosData].sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora)));
       setHorarios(horariosData);
       setSlotMinutos(settings.slotMinutos);
+    } catch (err) {
+      setError(toErrorMessage(err, 'No se pudieron cargar los turnos.'));
     } finally {
       setLoading(false);
     }
@@ -120,7 +125,9 @@ export function TurnosPage() {
       </div>
 
       {loading ? (
-        <p>Cargando...</p>
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} />
       ) : tab === 'agenda' ? (
         <div className="table-wrap">
           <table className="data-table">
@@ -170,7 +177,9 @@ export function TurnosPage() {
               ))}
               {turnos.length === 0 && (
                 <tr>
-                  <td colSpan={8}>No hay turnos solicitados todavia.</td>
+                  <td colSpan={8}>
+                    <EmptyState message="No hay turnos solicitados todavia." />
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -247,7 +256,9 @@ export function TurnosPage() {
                 ))}
                 {horarios.length === 0 && (
                   <tr>
-                    <td colSpan={4}>No hay horarios cargados todavia.</td>
+                    <td colSpan={4}>
+                      <EmptyState message="No hay horarios cargados todavia." />
+                    </td>
                   </tr>
                 )}
               </tbody>

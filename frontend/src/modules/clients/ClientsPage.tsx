@@ -8,18 +8,23 @@ import {
 import { ClientForm } from './ClientForm';
 import type { Client } from './clients.types';
 import type { ClientFormValues } from './clients.schema';
+import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 export function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [showForm, setShowForm] = useState(false);
 
   async function loadClients() {
     setLoading(true);
+    setError(null);
     try {
       const data = await listClientsRequest();
       setClients(data);
+    } catch (err) {
+      setError(toErrorMessage(err, 'No se pudieron cargar los clientes.'));
     } finally {
       setLoading(false);
     }
@@ -76,7 +81,9 @@ export function ClientsPage() {
       )}
 
       {loading ? (
-        <p>Cargando...</p>
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} />
       ) : (
         <table className="data-table">
           <thead>
@@ -105,7 +112,9 @@ export function ClientsPage() {
             ))}
             {clients.length === 0 && (
               <tr>
-                <td colSpan={4}>No hay clientes cargados todavia.</td>
+                <td colSpan={4}>
+                  <EmptyState message="No hay clientes cargados todavia." />
+                </td>
               </tr>
             )}
           </tbody>

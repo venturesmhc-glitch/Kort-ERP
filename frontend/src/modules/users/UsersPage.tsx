@@ -8,17 +8,22 @@ import {
 import { UserForm } from './UserForm';
 import type { AppUser } from './users.types';
 import type { UserFormValues } from './users.schema';
+import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 export function UsersPage() {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [showForm, setShowForm] = useState(false);
 
   async function loadUsers() {
     setLoading(true);
+    setError(null);
     try {
       setUsers(await listUsersRequest());
+    } catch (err) {
+      setError(toErrorMessage(err, 'No se pudieron cargar los usuarios.'));
     } finally {
       setLoading(false);
     }
@@ -42,7 +47,8 @@ export function UsersPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('¿Eliminar este usuario?')) return;
+    if (!confirm('¿Desactivar este usuario? No va a poder iniciar sesión ni aparecer como barbero disponible.'))
+      return;
     await deleteUserRequest(id);
     await loadUsers();
   }
@@ -71,14 +77,18 @@ export function UsersPage() {
             phone: editingUser.phone ?? '',
             address: editingUser.address ?? '',
             active: editingUser.active,
+            password: '',
           }}
+          isEditing
           onSubmit={handleUpdate}
           onCancel={() => setEditingUser(null)}
         />
       )}
 
       {loading ? (
-        <p>Cargando...</p>
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} />
       ) : (
         <div className="table-wrap">
           <table className="data-table">
@@ -110,15 +120,19 @@ export function UsersPage() {
                     <button type="button" onClick={() => setEditingUser(user)}>
                       Editar
                     </button>
-                    <button type="button" onClick={() => handleDelete(user.id)}>
-                      Eliminar
-                    </button>
+                    {user.active && (
+                      <button type="button" onClick={() => handleDelete(user.id)}>
+                        Desactivar
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={6}>No hay usuarios cargados todavia.</td>
+                  <td colSpan={6}>
+                    <EmptyState message="No hay usuarios cargados todavia." />
+                  </td>
                 </tr>
               )}
             </tbody>

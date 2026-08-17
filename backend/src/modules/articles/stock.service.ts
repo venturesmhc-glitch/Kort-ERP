@@ -45,21 +45,16 @@ async function applyMovement(
   return prisma.$transaction((tx) => run(tx));
 }
 
-// Gancho para Ventas y la reserva de Merch en la landing (Ventas ya lo usa
-// pasando su propio tx, ver sales.service.ts; la reserva de merch en la
-// landing todavia no existe). Las tres operaciones actualizan el stock
-// inmediatamente dentro de una transaccion junto con su StockMovement;
-// reserveStock no implementa una reserva-sin-descuento real todavia porque no
-// hay ningun consumidor que la necesite - cuando exista, extender con un
-// contador reservedStock separado en vez de descontar directo.
+// Gancho para Ventas y para el checkout de Merch en la landing: ambos
+// descuentan stock inmediatamente dentro de una transaccion junto con su
+// StockMovement. No existe todavia una reserva real (stock separado que no
+// descuenta hasta el retiro) - si el pedido de merch se cancela, el stock se
+// repone con increaseStock (ver merch.service.ts).
 export const StockService = {
   decreaseStock(articleId: string, quantity: number, reason?: string, tx?: Prisma.TransactionClient) {
     return applyMovement(articleId, 'OUT', quantity, reason, tx ?? prisma);
   },
   increaseStock(articleId: string, quantity: number, reason?: string, tx?: Prisma.TransactionClient) {
     return applyMovement(articleId, 'IN', quantity, reason, tx ?? prisma);
-  },
-  reserveStock(articleId: string, quantity: number, reason?: string, tx?: Prisma.TransactionClient) {
-    return applyMovement(articleId, 'OUT', quantity, reason ?? 'Reserva', tx ?? prisma);
   },
 };

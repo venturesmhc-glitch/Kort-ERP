@@ -7,6 +7,7 @@ import type { CatalogItem } from '../catalogs/catalogs.types';
 import { checkoutMerchRequest, type MerchClienteInput } from './merch.api';
 import { savePendingMerchSaleId, type CartItem } from './store.types';
 import { formatCurrency } from '../../lib/format';
+import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 const EMPTY_CLIENTE: MerchClienteInput = { nombre: '', apellido: '', telefono: '', email: '' };
 
@@ -20,12 +21,14 @@ export function StorePage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cliente, setCliente] = useState<MerchClienteInput>(EMPTY_CLIENTE);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [confirmado, setConfirmado] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function loadArticulos() {
     setLoading(true);
+    setLoadError(null);
     try {
       const [articulosData, tiposData] = await Promise.all([
         listPublicArticulosRequest(),
@@ -33,6 +36,8 @@ export function StorePage() {
       ]);
       setArticulos(articulosData);
       setTipos(tiposData);
+    } catch (err) {
+      setLoadError(toErrorMessage(err, 'No se pudo cargar la tienda.'));
     } finally {
       setLoading(false);
     }
@@ -146,7 +151,9 @@ export function StorePage() {
       </div>
 
       {loading ? (
-        <p>Cargando...</p>
+        <LoadingState />
+      ) : loadError ? (
+        <ErrorState message={loadError} />
       ) : (
         <div className="store-layout">
           <div className="card-grid">
@@ -169,13 +176,13 @@ export function StorePage() {
                 </button>
               </div>
             ))}
-            {articulosVisibles.length === 0 && <p className="text-muted">No hay articulos en esta categoria.</p>}
+            {articulosVisibles.length === 0 && <EmptyState message="No hay articulos en esta categoria." />}
           </div>
 
           <aside className="cart">
             <h2>Carrito</h2>
             {cart.length === 0 ? (
-              <p className="text-muted">Todavia no agregaste productos.</p>
+              <EmptyState message="Todavia no agregaste productos." />
             ) : (
               <ul className="cart-items">
                 {cart.map((item) => (
@@ -221,7 +228,7 @@ export function StorePage() {
               </div>
             )}
 
-            {error && <p className="form-error">{error}</p>}
+            {error && <ErrorState message={error} />}
 
             <button
               type="button"

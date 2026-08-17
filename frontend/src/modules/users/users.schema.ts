@@ -9,6 +9,11 @@ export const userFormSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   active: z.boolean(),
+  password: z
+    .string()
+    .min(6, 'La contrasena debe tener al menos 6 caracteres')
+    .optional()
+    .or(z.literal('')),
 });
 
 export type UserFormValues = z.infer<typeof userFormSchema>;

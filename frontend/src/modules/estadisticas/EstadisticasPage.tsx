@@ -9,6 +9,7 @@ import {
 import type { BarberStat, ClientStats, CutStats, SaleStats } from './estadisticas.types';
 import { BarChart } from '../../components/BarChart';
 import { formatCurrency, todayIso } from '../../lib/format';
+import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 function inicioDeMes() {
   const now = new Date();
@@ -22,6 +23,7 @@ function formatDiaCorto(iso: string) {
 
 export function EstadisticasPage() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [clientStats, setClientStats] = useState<ClientStats | null>(null);
   const [barberStats, setBarberStats] = useState<BarberStat[]>([]);
   const [cutStats, setCutStats] = useState<CutStats | null>(null);
@@ -33,6 +35,7 @@ export function EstadisticasPage() {
 
   async function load(activeFiltros: StatsFiltros) {
     setLoading(true);
+    setError(null);
     try {
       const [clients, barbers, cuts, sales] = await Promise.all([
         getClientStatsRequest(activeFiltros),
@@ -44,6 +47,8 @@ export function EstadisticasPage() {
       setBarberStats(barbers);
       setCutStats(cuts);
       setSaleStats(sales);
+    } catch (err) {
+      setError(toErrorMessage(err, 'No se pudieron cargar las estadisticas.'));
     } finally {
       setLoading(false);
     }
@@ -54,8 +59,16 @@ export function EstadisticasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading || !clientStats || !cutStats || !saleStats) {
-    return <p>Cargando...</p>;
+  if (loading) {
+    return <LoadingState />;
+  }
+
+  if (error) {
+    return <ErrorState message={error} />;
+  }
+
+  if (!clientStats || !cutStats || !saleStats) {
+    return null;
   }
 
   return (
@@ -207,7 +220,9 @@ export function EstadisticasPage() {
             ))}
             {barberStats.length === 0 && (
               <tr>
-                <td colSpan={4}>No hay actividad de barberos en el periodo.</td>
+                <td colSpan={4}>
+                  <EmptyState message="No hay actividad de barberos en el periodo." />
+                </td>
               </tr>
             )}
           </tbody>

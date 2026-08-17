@@ -12,6 +12,7 @@ import { MOVIMIENTO_SOURCE_LABELS, MOVIMIENTO_TIPO_LABELS, type Movimiento, type
 import type { MovimientoFormValues } from './tesoreria.schema';
 import { BarChart } from '../../components/BarChart';
 import { formatCurrency, formatDate, todayIso, toLocalIso } from '../../lib/format';
+import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 function inicioDeMes() {
   const now = new Date();
@@ -22,6 +23,7 @@ export function TesoreriaPage() {
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [resumen, setResumen] = useState<TreasurySummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [filtros, setFiltros] = useState<ListMovimientosFiltros>({
     fechaDesde: inicioDeMes(),
@@ -30,6 +32,7 @@ export function TesoreriaPage() {
 
   async function loadAll(activeFiltros: ListMovimientosFiltros) {
     setLoading(true);
+    setError(null);
     try {
       const [movs, res] = await Promise.all([
         listMovimientosRequest(activeFiltros),
@@ -37,6 +40,8 @@ export function TesoreriaPage() {
       ]);
       setMovimientos(movs);
       setResumen(res);
+    } catch (err) {
+      setError(toErrorMessage(err, 'No se pudo cargar la informacion de tesoreria.'));
     } finally {
       setLoading(false);
     }
@@ -117,9 +122,11 @@ export function TesoreriaPage() {
         </button>
       </div>
 
-      {loading || !totals || !breakeven ? (
-        <p>Cargando...</p>
-      ) : (
+      {loading ? (
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} />
+      ) : !totals || !breakeven ? null : (
         <>
           <div className="stat-row">
             <div className="stat-tile">
@@ -217,7 +224,9 @@ export function TesoreriaPage() {
                 ))}
                 {movimientos.length === 0 && (
                   <tr>
-                    <td colSpan={7}>No hay movimientos cargados todavia.</td>
+                    <td colSpan={7}>
+                      <EmptyState message="No hay movimientos cargados todavia." />
+                    </td>
                   </tr>
                 )}
               </tbody>

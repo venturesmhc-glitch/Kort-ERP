@@ -8,7 +8,7 @@ import { listClientsRequest } from '../clients/clients.api';
 import type { Client } from '../clients/clients.types';
 import { listTurnosRequest } from '../turnos/turnos.api';
 import type { Turno } from '../turnos/turnos.types';
-import { readFileAsDataUrl } from '../../lib/mockStore';
+import { readFileAsDataUrl } from '../../lib/file';
 import { todayIso } from '../../lib/format';
 
 interface CorteFormProps {

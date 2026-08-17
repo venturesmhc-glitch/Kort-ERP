@@ -12,7 +12,7 @@ export interface AppUser {
   active: boolean;
 }
 
-export type UserInput = Omit<AppUser, 'id'>;
+export type UserInput = Omit<AppUser, 'id'> & { password?: string };
 
 export interface PublicBarbero {
   id: string;

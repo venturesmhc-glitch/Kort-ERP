@@ -4,17 +4,25 @@ import { CorteForm } from './CorteForm';
 import type { Corte } from './cortes.types';
 import type { CorteFormValues } from './cortes.schema';
 import { formatCurrency, formatDate } from '../../lib/format';
+import { useAuth } from '../auth/AuthContext';
+import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 export function CortesPage() {
+  const { user } = useAuth();
+  const canDelete = user?.role === 'DEV' || user?.role === 'ENCARGADO';
   const [cortes, setCortes] = useState<Corte[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
   async function loadCortes() {
     setLoading(true);
+    setError(null);
     try {
       const data = await listCortesRequest();
       setCortes([...data].reverse());
+    } catch (err) {
+      setError(toErrorMessage(err, 'No se pudieron cargar los cortes.'));
     } finally {
       setLoading(false);
     }
@@ -25,9 +33,10 @@ export function CortesPage() {
   }, []);
 
   async function handleCreate(values: CorteFormValues) {
-    await crearCorteRequest(values);
+    const corte = await crearCorteRequest(values);
     setShowForm(false);
     await loadCortes();
+    if (corte.treasuryWarning) alert(corte.treasuryWarning);
   }
 
   async function handleDelete(id: string) {
@@ -50,7 +59,9 @@ export function CortesPage() {
       {showForm && <CorteForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />}
 
       {loading ? (
-        <p>Cargando...</p>
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} />
       ) : (
         <div className="table-wrap">
           <table className="data-table">
@@ -62,7 +73,7 @@ export function CortesPage() {
                 <th>Barbero</th>
                 <th>Tipo de corte</th>
                 <th>Precio</th>
-                <th></th>
+                {canDelete && <th></th>}
               </tr>
             </thead>
             <tbody>
@@ -82,16 +93,20 @@ export function CortesPage() {
                   <td>{corte.barberoNombre}</td>
                   <td>{corte.tipoCorteNombre}</td>
                   <td>{formatCurrency(corte.precio)}</td>
-                  <td className="data-table-actions">
-                    <button type="button" onClick={() => handleDelete(corte.id)}>
-                      Eliminar
-                    </button>
-                  </td>
+                  {canDelete && (
+                    <td className="data-table-actions">
+                      <button type="button" onClick={() => handleDelete(corte.id)}>
+                        Eliminar
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
               {cortes.length === 0 && (
                 <tr>
-                  <td colSpan={7}>No hay cortes registrados todavia.</td>
+                  <td colSpan={canDelete ? 7 : 6}>
+                    <EmptyState message="No hay cortes registrados todavia." />
+                  </td>
                 </tr>
               )}
             </tbody>

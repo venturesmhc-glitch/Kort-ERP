@@ -12,7 +12,7 @@ const MERCH_SALE_INCLUDE = {
 } satisfies Prisma.SaleInclude;
 
 // Checkout publico de merch (etapa 11): el stock se descuenta ya mismo (igual
-// que Ventas, ver StockService.reserveStock) y el pedido queda
+// que Ventas, ver StockService.decreaseStock) y el pedido queda
 // PENDING_PICKUP hasta que se retira y paga en el local (sin pasarela). El
 // ingreso en Tesoreria recien se registra al marcarlo DELIVERED (ver
 // updateMerchOrderStatus) para no contabilizar pedidos que terminan
@@ -60,7 +60,7 @@ export async function createMerchOrder(input: CheckoutInput) {
     });
 
     for (const item of itemsWithPrice) {
-      await StockService.reserveStock(item.articleId, item.quantity, `Pedido merch ${sale.id}`, tx);
+      await StockService.decreaseStock(item.articleId, item.quantity, `Pedido merch ${sale.id}`, tx);
     }
 
     return sale;
@@ -109,6 +109,6 @@ export async function updateMerchOrderStatus(id: string, input: UpdateMerchStatu
     data: { status: 'DELIVERED' },
     include: MERCH_SALE_INCLUDE,
   });
-  await TreasuryService.recordIncomeFromSale(updated);
-  return updated;
+  const treasuryWarning = await TreasuryService.recordIncomeFromSale(updated);
+  return treasuryWarning ? { ...updated, treasuryWarning } : updated;
 }

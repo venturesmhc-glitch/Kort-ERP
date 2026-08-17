@@ -70,9 +70,9 @@ export async function createSale(input: CreateSaleInput, user: AuthUser) {
     return created;
   });
 
-  await TreasuryService.recordIncomeFromSale(sale);
+  const treasuryWarning = await TreasuryService.recordIncomeFromSale(sale);
 
-  return sale;
+  return treasuryWarning ? { ...sale, treasuryWarning } : sale;
 }
 
 export function listSales(filters: ListSalesQuery) {

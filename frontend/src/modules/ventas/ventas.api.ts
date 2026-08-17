@@ -70,8 +70,10 @@ export async function listVentasRequest(filtros: ListVentasFiltros = {}): Promis
   return dtos.map(toVenta);
 }
 
-export async function crearVentaRequest(input: CrearVentaInput): Promise<Venta> {
-  const dto = await apiRequest<SaleDto>('/sales', {
+export async function crearVentaRequest(
+  input: CrearVentaInput
+): Promise<Venta & { treasuryWarning?: string }> {
+  const dto = await apiRequest<SaleDto & { treasuryWarning?: string }>('/sales', {
     method: 'POST',
     body: {
       items: input.items.map((item) => ({
@@ -83,5 +85,5 @@ export async function crearVentaRequest(input: CrearVentaInput): Promise<Venta> 
       client: input.clienteNuevo,
     },
   });
-  return toVenta(dto);
+  return { ...toVenta(dto), treasuryWarning: dto.treasuryWarning };
 }

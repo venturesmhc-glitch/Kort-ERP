@@ -12,6 +12,7 @@ import {
 import { listPublicArticulosRequest } from '../articulos/articulos.api';
 import type { Articulo } from '../articulos/articulos.types';
 import { formatCurrency, formatDate, toLocalIso } from '../../lib/format';
+import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 function fechaHora(iso: string) {
   return `${formatDate(toLocalIso(new Date(iso)))} ${new Date(iso).toLocaleTimeString('es-AR', {
@@ -24,23 +25,31 @@ export function VentasPage() {
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [filtros, setFiltros] = useState<ListVentasFiltros>({});
   const [pedidosMerch, setPedidosMerch] = useState<MerchPedido[]>([]);
+  const [merchError, setMerchError] = useState<string | null>(null);
 
   async function loadVentas(activeFiltros: ListVentasFiltros) {
     setLoading(true);
+    setError(null);
     try {
       setVentas(await listVentasRequest(activeFiltros));
+    } catch (err) {
+      setError(toErrorMessage(err, 'No se pudieron cargar las ventas.'));
     } finally {
       setLoading(false);
     }
   }
 
-  function loadPedidosMerch() {
-    listMerchPendientesRequest()
-      .then(setPedidosMerch)
-      .catch(() => setPedidosMerch([]));
+  async function loadPedidosMerch() {
+    setMerchError(null);
+    try {
+      setPedidosMerch(await listMerchPendientesRequest());
+    } catch (err) {
+      setMerchError(toErrorMessage(err, 'No se pudieron cargar los pedidos de merch pendientes.'));
+    }
   }
 
   useEffect(() => {
@@ -51,15 +60,17 @@ export function VentasPage() {
   }, []);
 
   async function handleCreate(values: CrearVentaInput) {
-    await crearVentaRequest(values);
+    const venta = await crearVentaRequest(values);
     setShowForm(false);
     await loadVentas(filtros);
+    if (venta.treasuryWarning) alert(venta.treasuryWarning);
   }
 
   async function handleEntregarMerch(id: string) {
-    await marcarMerchEntregadoRequest(id);
+    const pedido = await marcarMerchEntregadoRequest(id);
     loadPedidosMerch();
     await loadVentas(filtros);
+    if (pedido.treasuryWarning) alert(pedido.treasuryWarning);
   }
 
   async function handleCancelarMerch(id: string) {
@@ -88,44 +99,50 @@ export function VentasPage() {
       {showForm && <VentaForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />}
 
       <h2>Pedidos de merch pendientes de retiro</h2>
-      <div className="table-wrap" style={{ marginBottom: '1.5rem' }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Cliente</th>
-              <th>Telefono</th>
-              <th>Articulos</th>
-              <th>Total</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {pedidosMerch.map((pedido) => (
-              <tr key={pedido.id}>
-                <td>{fechaHora(pedido.fecha)}</td>
-                <td>{pedido.clienteNombre ?? '-'}</td>
-                <td>{pedido.clienteTelefono ?? '-'}</td>
-                <td>{pedido.items.map((item) => `${item.articuloNombre} x${item.cantidad}`).join(', ')}</td>
-                <td>{formatCurrency(pedido.total)}</td>
-                <td className="data-table-actions">
-                  <button type="button" onClick={() => handleEntregarMerch(pedido.id)}>
-                    Entregar
-                  </button>
-                  <button type="button" onClick={() => handleCancelarMerch(pedido.id)}>
-                    Cancelar
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {pedidosMerch.length === 0 && (
+      {merchError ? (
+        <ErrorState message={merchError} />
+      ) : (
+        <div className="table-wrap" style={{ marginBottom: '1.5rem' }}>
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan={6}>No hay pedidos de merch pendientes de retiro.</td>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Telefono</th>
+                <th>Articulos</th>
+                <th>Total</th>
+                <th></th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {pedidosMerch.map((pedido) => (
+                <tr key={pedido.id}>
+                  <td>{fechaHora(pedido.fecha)}</td>
+                  <td>{pedido.clienteNombre ?? '-'}</td>
+                  <td>{pedido.clienteTelefono ?? '-'}</td>
+                  <td>{pedido.items.map((item) => `${item.articuloNombre} x${item.cantidad}`).join(', ')}</td>
+                  <td>{formatCurrency(pedido.total)}</td>
+                  <td className="data-table-actions">
+                    <button type="button" onClick={() => handleEntregarMerch(pedido.id)}>
+                      Entregar
+                    </button>
+                    <button type="button" onClick={() => handleCancelarMerch(pedido.id)}>
+                      Cancelar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {pedidosMerch.length === 0 && (
+                <tr>
+                  <td colSpan={6}>
+                    <EmptyState message="No hay pedidos de merch pendientes de retiro." />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <h2>Ventas de mostrador</h2>
       <div className="stat-row">
@@ -173,7 +190,9 @@ export function VentasPage() {
       </div>
 
       {loading ? (
-        <p>Cargando...</p>
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} />
       ) : (
         <div className="table-wrap">
           <table className="data-table">
@@ -198,7 +217,9 @@ export function VentasPage() {
               ))}
               {ventas.length === 0 && (
                 <tr>
-                  <td colSpan={5}>No hay ventas registradas todavia.</td>
+                  <td colSpan={5}>
+                    <EmptyState message="No hay ventas registradas todavia." />
+                  </td>
                 </tr>
               )}
             </tbody>

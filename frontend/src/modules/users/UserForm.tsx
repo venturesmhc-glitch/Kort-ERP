@@ -5,6 +5,7 @@ import type { Role } from '../auth/auth.types';
 
 interface UserFormProps {
   initialValues?: UserFormValues;
+  isEditing?: boolean;
   onSubmit: (values: UserFormValues) => Promise<void>;
   onCancel: () => void;
 }
@@ -18,6 +19,7 @@ const EMPTY_VALUES: UserFormValues = {
   phone: '',
   address: '',
   active: true,
+  password: '',
 };
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -26,7 +28,12 @@ const ROLE_LABELS: Record<Role, string> = {
   BARBERO: 'Barbero',
 };
 
-export function UserForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel }: UserFormProps) {
+export function UserForm({
+  initialValues = EMPTY_VALUES,
+  isEditing = false,
+  onSubmit,
+  onCancel,
+}: UserFormProps) {
   const { user: currentUser } = useAuth();
   const [values, setValues] = useState<UserFormValues>(initialValues);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +49,11 @@ export function UserForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel }: U
     const parsed = userFormSchema.safeParse(values);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Datos invalidos');
+      return;
+    }
+
+    if (!isEditing && !parsed.data.password) {
+      setError('La contrasena es requerida para crear un usuario');
       return;
     }
 
@@ -116,6 +128,15 @@ export function UserForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel }: U
         id="address"
         value={values.address}
         onChange={(e) => setValues((prev) => ({ ...prev, address: e.target.value }))}
+      />
+
+      <label htmlFor="password">{isEditing ? 'Nueva contrasena (opcional)' : 'Contrasena'}</label>
+      <input
+        id="password"
+        type="password"
+        value={values.password ?? ''}
+        placeholder={isEditing ? 'Dejar en blanco para no cambiarla' : ''}
+        onChange={(e) => setValues((prev) => ({ ...prev, password: e.target.value }))}
       />
 
       <label className="checkbox-field">

@@ -13,6 +13,7 @@ import type { CatalogCategory, CatalogItem, CatalogKey } from './catalogs.types'
 import type { CatalogItemFormValues } from './catalogs.schema';
 import { ApiError } from '../../lib/apiClient';
 import { formatCurrency } from '../../lib/format';
+import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 const ACCENTED_CHARS: Record<string, string> = {
   a: 'aàáâãäå',
@@ -44,18 +45,26 @@ export function ParametrizadosPage() {
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function loadCategories(selectKey?: CatalogKey) {
-    const list = await listCategoriesRequest();
-    setCategories(list);
-    const nextKey = selectKey ?? list[0]?.key ?? null;
-    setActiveKey(nextKey);
+    try {
+      const list = await listCategoriesRequest();
+      setCategories(list);
+      const nextKey = selectKey ?? list[0]?.key ?? null;
+      setActiveKey(nextKey);
+    } catch (err) {
+      setLoadError(toErrorMessage(err, 'No se pudieron cargar los catalogos.'));
+    }
   }
 
   async function loadItems(key: CatalogKey) {
     setLoading(true);
+    setLoadError(null);
     try {
       setItems(await listCatalogItemsRequest(key));
+    } catch (err) {
+      setLoadError(toErrorMessage(err, 'No se pudieron cargar los registros.'));
     } finally {
       setLoading(false);
     }
@@ -164,7 +173,8 @@ export function ParametrizadosPage() {
         </form>
       )}
 
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorState message={error} />}
+      {loadError && <ErrorState message={loadError} />}
 
       <div className="tabs">
         {categories.map((category) => (
@@ -202,8 +212,8 @@ export function ParametrizadosPage() {
       )}
 
       {loading ? (
-        <p>Cargando...</p>
-      ) : (
+        <LoadingState />
+      ) : !loadError ? (
         <div className="table-wrap">
           <table className="data-table">
             <thead>
@@ -238,13 +248,15 @@ export function ParametrizadosPage() {
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan={showPrecio ? 5 : 4}>No hay registros en este catalogo todavia.</td>
+                  <td colSpan={showPrecio ? 5 : 4}>
+                    <EmptyState message="No hay registros en este catalogo todavia." />
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

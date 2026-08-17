@@ -10,6 +10,7 @@ import { crearTurnoRequest, listSlotsDisponiblesRequest } from '../turnos/turnos
 import type { Turno } from '../turnos/turnos.types';
 import { clearPendingMerchSaleId, loadPendingMerchSaleId } from '../public-store/store.types';
 import { formatDate, todayIso } from '../../lib/format';
+import { ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 const TODAY = todayIso();
 const STEP_LABELS = ['Tus datos', 'Barbero', 'Horario', 'Tipo de corte', 'Confirmar'];
@@ -34,10 +35,18 @@ export function TurnoWizardPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [turnoConfirmado, setTurnoConfirmado] = useState<Turno | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialError, setInitialError] = useState<string | null>(null);
 
   useEffect(() => {
-    listPublicBarberosRequest().then(setBarberos);
-    listPublicCatalogItemsRequest('tipos-corte').then(setTiposCorte);
+    setInitialLoading(true);
+    setInitialError(null);
+    Promise.all([
+      listPublicBarberosRequest().then(setBarberos),
+      listPublicCatalogItemsRequest('tipos-corte').then(setTiposCorte),
+    ])
+      .catch((err) => setInitialError(toErrorMessage(err, 'No se pudo cargar la informacion del turno.')))
+      .finally(() => setInitialLoading(false));
   }, []);
 
   useEffect(() => {
@@ -59,10 +68,12 @@ export function TurnoWizardPage() {
       setSlots([]);
       return;
     }
-    listSlotsDisponiblesRequest(barberoId, fecha).then((available) => {
-      setSlots(available);
-      setHora((current) => (available.includes(current) ? current : ''));
-    });
+    listSlotsDisponiblesRequest(barberoId, fecha)
+      .then((available) => {
+        setSlots(available);
+        setHora((current) => (available.includes(current) ? current : ''));
+      })
+      .catch(() => setSlots([]));
   }, [barberoId, fecha]);
 
   function goToStep(next: number) {
@@ -143,6 +154,22 @@ export function TurnoWizardPage() {
         <button type="button" onClick={() => navigate('/')}>
           Volver al inicio
         </button>
+      </div>
+    );
+  }
+
+  if (initialLoading) {
+    return (
+      <div className="wizard-card">
+        <LoadingState />
+      </div>
+    );
+  }
+
+  if (initialError) {
+    return (
+      <div className="wizard-card">
+        <ErrorState message={initialError} />
       </div>
     );
   }

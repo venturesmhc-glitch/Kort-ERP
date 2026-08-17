@@ -7,13 +7,16 @@ import type { Turno } from '../turnos/turnos.types';
 import type { Articulo } from '../articulos/articulos.types';
 import { formatCurrency, todayIso } from '../../lib/format';
 import { useAuth } from '../auth/AuthContext';
+import { ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 
 const TODAY = todayIso();
 
 export function DashboardPage() {
   const { user } = useAuth();
   const canSeeStock = user?.role === 'DEV' || user?.role === 'ENCARGADO';
+  const canSeeVentas = user?.role === 'DEV' || user?.role === 'ENCARGADO';
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [turnosHoy, setTurnosHoy] = useState<Turno[]>([]);
   const [stockBajo, setStockBajo] = useState<Articulo[]>([]);
   const [totalVentas, setTotalVentas] = useState(0);
@@ -21,28 +24,35 @@ export function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const [turnos, articulosStockBajo, ventas, cortes] = await Promise.all([
-        listTurnosRequest(),
-        canSeeStock ? listStockBajoRequest() : Promise.resolve([]),
-        listVentasRequest(),
-        listCortesRequest(),
-      ]);
+      setLoading(true);
+      setError(null);
+      try {
+        const [turnos, articulosStockBajo, ventas, cortes] = await Promise.all([
+          listTurnosRequest(),
+          canSeeStock ? listStockBajoRequest() : Promise.resolve([]),
+          canSeeVentas ? listVentasRequest({ fechaDesde: TODAY, fechaHasta: TODAY }) : Promise.resolve([]),
+          listCortesRequest(),
+        ]);
 
-      setTurnosHoy(turnos.filter((t) => t.fecha === TODAY));
-      setStockBajo(articulosStockBajo);
-      setTotalVentas(ventas.reduce((sum, v) => sum + v.total, 0));
+        setTurnosHoy(turnos.filter((t) => t.fecha === TODAY));
+        setStockBajo(articulosStockBajo);
+        setTotalVentas(ventas.reduce((sum, v) => sum + v.total, 0));
 
-      const porBarbero = new Map<string, number>();
-      cortes.forEach((c) => porBarbero.set(c.barberoNombre, (porBarbero.get(c.barberoNombre) ?? 0) + 1));
-      setCortesEquipo(
-        [...porBarbero.entries()].map(([nombre, cantidad]) => ({ nombre, cantidad }))
-      );
-
-      setLoading(false);
+        const cortesHoy = cortes.filter((c) => c.fecha === TODAY);
+        const porBarbero = new Map<string, number>();
+        cortesHoy.forEach((c) => porBarbero.set(c.barberoNombre, (porBarbero.get(c.barberoNombre) ?? 0) + 1));
+        setCortesEquipo(
+          [...porBarbero.entries()].map(([nombre, cantidad]) => ({ nombre, cantidad }))
+        );
+      } catch (err) {
+        setError(toErrorMessage(err, 'No se pudo cargar el dashboard.'));
+      } finally {
+        setLoading(false);
+      }
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [canSeeStock, canSeeVentas]);
 
   return (
     <div>
@@ -50,12 +60,13 @@ export function DashboardPage() {
         <h1>Dashboard</h1>
       </div>
       <p className="text-muted">
-        Bienvenido{user ? `, ${user.firstName}` : ''}. Resumen general del estado del sistema
-        (datos de ejemplo).
+        Bienvenido{user ? `, ${user.firstName}` : ''}. Resumen del dia de hoy.
       </p>
 
       {loading ? (
-        <p>Cargando...</p>
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} />
       ) : (
         <>
           <div className="stat-row">
@@ -63,10 +74,12 @@ export function DashboardPage() {
               <span className="stat-label">Turnos de hoy</span>
               <span className="stat-value">{turnosHoy.length}</span>
             </div>
-            <div className="stat-tile">
-              <span className="stat-label">Total vendido</span>
-              <span className="stat-value">{formatCurrency(totalVentas)}</span>
-            </div>
+            {canSeeVentas && (
+              <div className="stat-tile">
+                <span className="stat-label">Vendido hoy</span>
+                <span className="stat-value">{formatCurrency(totalVentas)}</span>
+              </div>
+            )}
             {canSeeStock && (
               <div className="stat-tile">
                 <span className="stat-label">Alertas de stock</span>
@@ -110,9 +123,9 @@ export function DashboardPage() {
             )}
 
             <div className="card">
-              <h2>Desempeno del equipo</h2>
+              <h2>Desempeno del equipo hoy</h2>
               {cortesEquipo.length === 0 ? (
-                <p className="text-muted">Todavia no hay cortes registrados.</p>
+                <p className="text-muted">Todavia no hay cortes registrados hoy.</p>
               ) : (
                 <ul className="simple-list">
                   {cortesEquipo.map((item) => (
