@@ -9,6 +9,7 @@ import { savePendingMerchSaleId, type CartItem } from './store.types';
 import { formatCurrency } from '../../lib/format';
 import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
+import { CategoryCarousel, type CarouselItem } from '../../components/CategoryCarousel';
 
 const EMPTY_CLIENTE: MerchClienteInput = { nombre: '', apellido: '', telefono: '', email: '' };
 
@@ -19,7 +20,6 @@ export function StorePage() {
 
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [tipos, setTipos] = useState<CatalogItem[]>([]);
-  const [filtroTipo, setFiltroTipo] = useState<string>('todos');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cliente, setCliente] = useState<MerchClienteInput>(EMPTY_CLIENTE);
   const [loading, setLoading] = useState(true);
@@ -49,9 +49,22 @@ export function StorePage() {
     loadArticulos();
   }, []);
 
-  const articulosVisibles = articulos.filter(
-    (a) => filtroTipo === 'todos' || a.tipoProductoId === filtroTipo
-  );
+  // Agrupa por categoria (tipo de producto) para renderizar un carrusel por
+  // categoria; el orden respeta el catalogo publico y el primer articulo de
+  // cada categoria se destaca visualmente (no hay metrica de ventas publica).
+  const categorias = tipos
+    .map((tipo) => ({
+      id: tipo.id,
+      nombre: tipo.nombre,
+      articulos: articulos.filter((a) => a.tipoProductoId === tipo.id),
+    }))
+    .filter((categoria) => categoria.articulos.length > 0);
+
+  const idsConCategoria = new Set(categorias.map((c) => c.id));
+  const sinCategoria = articulos.filter((a) => !idsConCategoria.has(a.tipoProductoId));
+  if (sinCategoria.length > 0) {
+    categorias.push({ id: 'otros', nombre: 'Otros productos', articulos: sinCategoria });
+  }
 
   function addToCart(articulo: Articulo) {
     setCart((prev) => {
@@ -132,53 +145,28 @@ export function StorePage() {
         </div>
       )}
 
-      <div className="tabs">
-        <button
-          type="button"
-          className={filtroTipo === 'todos' ? 'tab active' : 'tab'}
-          onClick={() => setFiltroTipo('todos')}
-        >
-          Todos
-        </button>
-        {tipos.map((tipo) => (
-          <button
-            key={tipo.id}
-            type="button"
-            className={filtroTipo === tipo.id ? 'tab active' : 'tab'}
-            onClick={() => setFiltroTipo(tipo.id)}
-          >
-            {tipo.nombre}
-          </button>
-        ))}
-      </div>
-
       {loading ? (
         <LoadingState />
       ) : loadError ? (
         <ErrorState message={loadError} />
       ) : (
         <div className="store-layout">
-          <div className="card-grid">
-            {articulosVisibles.map((articulo) => (
-              <div className="card product-card" key={articulo.id}>
-                {articulo.imagenUrl ? (
-                  <img src={articulo.imagenUrl} alt={articulo.nombre} className="product-image" />
-                ) : (
-                  <div className="product-image product-image-empty">Sin imagen</div>
-                )}
-                <h3>{articulo.nombre}</h3>
-                <p className="text-muted">{articulo.tipoProductoNombre}</p>
-                <p className="product-price">{formatCurrency(articulo.precio)}</p>
-                <button
-                  type="button"
-                  disabled={articulo.stock === 0}
-                  onClick={() => addToCart(articulo)}
-                >
-                  {articulo.stock === 0 ? 'Sin stock' : 'Agregar al carrito'}
-                </button>
-              </div>
-            ))}
-            {articulosVisibles.length === 0 && <EmptyState message="No hay articulos en esta categoria." />}
+          <div className="store-carousels">
+            {categorias.length === 0 && <EmptyState message="Todavia no hay articulos cargados." />}
+            {categorias.map((categoria) => {
+              const items: CarouselItem[] = categoria.articulos.map((articulo, index) => ({
+                id: articulo.id,
+                name: articulo.nombre,
+                subtitle: articulo.descripcion,
+                price: articulo.precio,
+                imageUrl: articulo.imagenUrl,
+                disabled: articulo.stock === 0,
+                ctaLabel: articulo.stock === 0 ? 'Sin stock' : 'Agregar al carrito',
+                onCta: () => addToCart(articulo),
+                featured: index === 0,
+              }));
+              return <CategoryCarousel key={categoria.id} title={categoria.nombre} items={items} />;
+            })}
           </div>
 
           <aside className="cart">

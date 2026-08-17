@@ -15,12 +15,13 @@ import { TesoreriaPage } from './modules/tesoreria/TesoreriaPage';
 import { JornadasPage } from './modules/jornadas/JornadasPage';
 import { EstadisticasPage } from './modules/estadisticas/EstadisticasPage';
 import { LandingHomePage } from './modules/landing/LandingHomePage';
+import { ContactPage } from './modules/landing/ContactPage';
 import { TurnoWizardPage } from './modules/public-turnos/TurnoWizardPage';
 import { StorePage } from './modules/public-store/StorePage';
 
 export const router = createBrowserRouter([
   {
-    path: '/login',
+    path: '/admin/login',
     element: <LoginPage />,
   },
   {
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
       { path: '/', element: <LandingHomePage /> },
       { path: '/turnos', element: <TurnoWizardPage /> },
       { path: '/tienda', element: <StorePage /> },
+      { path: '/contacto', element: <ContactPage /> },
     ],
   },
   {

@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
+import { businessConfig } from '../../config/business.config';
 
 export function LandingHomePage() {
   return (
     <div>
       <section className="public-hero">
-        <h1>Reserva tu turno en Kort</h1>
-        <p>Elegi tu barbero, tu horario y el tipo de corte que buscas, en minutos.</p>
+        <h1>Reserva tu turno en {businessConfig.name}</h1>
+        <p>{businessConfig.tagline}</p>
         <div className="public-hero-actions">
           <Link to="/turnos" className="button-primary">
             Solicitar turno
