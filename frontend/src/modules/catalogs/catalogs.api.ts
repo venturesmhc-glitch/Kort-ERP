@@ -1,60 +1,74 @@
-import { createMockCollection } from '../../lib/mockStore';
-import type { CatalogInput, CatalogItem, CatalogKey } from './catalogs.types';
+import { apiRequest } from '../../lib/apiClient';
+import type { CatalogCategory, CatalogCategoryInput, CatalogInput, CatalogItem, CatalogKey } from './catalogs.types';
 
-const CATALOG_SEEDS: Record<CatalogKey, CatalogItem[]> = {
-  'tipos-corte': [
-    { id: 'corte-clasico', nombre: 'Corte clasico', activo: true },
-    { id: 'corte-fade', nombre: 'Fade', activo: true },
-    { id: 'corte-diseno', nombre: 'Diseno', activo: true },
-    { id: 'corte-barba', nombre: 'Barba', activo: true },
-    { id: 'corte-combo', nombre: 'Combo corte + barba', activo: true },
-  ],
-  'tipos-producto': [
-    { id: 'prod-cosmetica', nombre: 'Cosmetica', activo: true },
-    { id: 'prod-indumentaria', nombre: 'Indumentaria', activo: true },
-    { id: 'prod-accesorios', nombre: 'Accesorios', activo: true },
-  ],
-  'categorias-costos': [
-    { id: 'costo-alquiler', nombre: 'Alquiler', descripcion: 'Costo fijo', activo: true },
-    { id: 'costo-insumos', nombre: 'Insumos', descripcion: 'Costo variable', activo: true },
-    { id: 'costo-servicios', nombre: 'Servicios (luz, agua, internet)', activo: true },
-    { id: 'costo-sueldos', nombre: 'Sueldos', descripcion: 'Costo fijo', activo: true },
-  ],
-  'categorias-ingresos': [
-    { id: 'ingreso-cortes', nombre: 'Cortes', activo: true },
-    { id: 'ingreso-merchandising', nombre: 'Ventas merchandising', activo: true },
-    { id: 'ingreso-otros', nombre: 'Otros', activo: true },
-  ],
-};
-
-const collections = new Map<CatalogKey, ReturnType<typeof createMockCollection<CatalogItem>>>();
-
-function getCollection(key: CatalogKey) {
-  let collection = collections.get(key);
-  if (!collection) {
-    collection = createMockCollection<CatalogItem>(`catalog-${key}`, CATALOG_SEEDS[key]);
-    collections.set(key, collection);
-  }
-  return collection;
+interface CategoryDto {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  isSystem: boolean;
 }
 
-export function listCatalogItemsRequest(key: CatalogKey): Promise<CatalogItem[]> {
-  return getCollection(key).list();
+interface ItemDto {
+  id: string;
+  name: string;
+  description: string | null;
+  active: boolean;
 }
 
-export function createCatalogItemRequest(key: CatalogKey, input: CatalogInput) {
-  return getCollection(key).create(input);
+function toCategory(dto: CategoryDto): CatalogCategory {
+  return { id: dto.id, key: dto.key, name: dto.name, description: dto.description, isSystem: dto.isSystem };
 }
 
-export function updateCatalogItemRequest(key: CatalogKey, id: string, input: CatalogInput) {
-  return getCollection(key).update(id, input);
+function toItem(dto: ItemDto): CatalogItem {
+  return { id: dto.id, nombre: dto.name, descripcion: dto.description ?? undefined, activo: dto.active };
 }
 
-export function deleteCatalogItemRequest(key: CatalogKey, id: string) {
-  return getCollection(key).remove(id);
+function fromInput(input: CatalogInput) {
+  return { name: input.nombre, description: input.descripcion, active: input.activo };
+}
+
+export async function listCategoriesRequest(): Promise<CatalogCategory[]> {
+  const dtos = await apiRequest<CategoryDto[]>('/catalogs');
+  return dtos.map(toCategory);
+}
+
+export async function createCategoryRequest(input: CatalogCategoryInput): Promise<CatalogCategory> {
+  const dto = await apiRequest<CategoryDto>('/catalogs', { method: 'POST', body: input });
+  return toCategory(dto);
+}
+
+export async function deleteCategoryRequest(key: CatalogKey): Promise<void> {
+  return apiRequest<void>(`/catalogs/${key}`, { method: 'DELETE' });
+}
+
+export async function listCatalogItemsRequest(key: CatalogKey): Promise<CatalogItem[]> {
+  const dtos = await apiRequest<ItemDto[]>(`/catalogs/${key}/items?includeInactive=true`);
+  return dtos.map(toItem);
+}
+
+export async function createCatalogItemRequest(key: CatalogKey, input: CatalogInput): Promise<CatalogItem> {
+  const dto = await apiRequest<ItemDto>(`/catalogs/${key}/items`, { method: 'POST', body: fromInput(input) });
+  return toItem(dto);
+}
+
+export async function updateCatalogItemRequest(
+  key: CatalogKey,
+  id: string,
+  input: CatalogInput
+): Promise<CatalogItem> {
+  const dto = await apiRequest<ItemDto>(`/catalogs/${key}/items/${id}`, {
+    method: 'PUT',
+    body: fromInput(input),
+  });
+  return toItem(dto);
+}
+
+export async function deleteCatalogItemRequest(key: CatalogKey, id: string): Promise<void> {
+  return apiRequest<void>(`/catalogs/${key}/items/${id}`, { method: 'DELETE' });
 }
 
 export async function listActiveCatalogItemsRequest(key: CatalogKey): Promise<CatalogItem[]> {
-  const items = await getCollection(key).list();
-  return items.filter((item) => item.activo);
+  const dtos = await apiRequest<ItemDto[]>(`/catalogs/${key}/items`);
+  return dtos.map(toItem);
 }

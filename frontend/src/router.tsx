@@ -45,10 +45,10 @@ export const router = createBrowserRouter([
           { path: 'articulos', element: <ArticulosPage /> },
           { path: 'ventas', element: <VentasPage /> },
           { path: 'tesoreria', element: <TesoreriaPage /> },
-          { path: 'parametrizados', element: <ParametrizadosPage /> },
           {
             element: <ProtectedRoute allowedRoles={['DEV', 'ENCARGADO']} />,
             children: [
+              { path: 'parametrizados', element: <ParametrizadosPage /> },
               { path: 'usuarios', element: <UsersPage /> },
               { path: 'jornadas', element: <JornadasPage /> },
               { path: 'estadisticas', element: <EstadisticasPage /> },

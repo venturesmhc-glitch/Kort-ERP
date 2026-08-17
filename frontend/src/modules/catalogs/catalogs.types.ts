@@ -1,8 +1,14 @@
-export type CatalogKey =
-  | 'tipos-corte'
-  | 'tipos-producto'
-  | 'categorias-costos'
-  | 'categorias-ingresos';
+export type CatalogKey = string;
+
+export interface CatalogCategory {
+  id: string;
+  key: CatalogKey;
+  name: string;
+  description?: string | null;
+  isSystem: boolean;
+}
+
+export type CatalogCategoryInput = { key: string; name: string; description?: string };
 
 export interface CatalogItem {
   id: string;
@@ -12,17 +18,3 @@ export interface CatalogItem {
 }
 
 export type CatalogInput = Omit<CatalogItem, 'id'>;
-
-export const CATALOG_LABELS: Record<CatalogKey, string> = {
-  'tipos-corte': 'Tipos de corte',
-  'tipos-producto': 'Tipos de producto',
-  'categorias-costos': 'Categorias de costos',
-  'categorias-ingresos': 'Categorias de ingresos',
-};
-
-export const CATALOG_KEYS: CatalogKey[] = [
-  'tipos-corte',
-  'tipos-producto',
-  'categorias-costos',
-  'categorias-ingresos',
-];

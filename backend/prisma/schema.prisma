@@ -40,3 +40,37 @@ model Client {
 
   @@map("clients")
 }
+
+// Modulo Parametrizados: modelo generico (categoria + items) para que se puedan
+// sumar catalogos nuevos sin migracion. Ver skills.md #5.11 y #8.
+model ParameterCategory {
+  id          String    @id @default(uuid())
+  key         String    @unique
+  name        String
+  description String?
+  isSystem    Boolean   @default(false)
+  order       Int       @default(0)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  items       ParameterItem[]
+
+  @@map("parameter_categories")
+}
+
+model ParameterItem {
+  id          String            @id @default(uuid())
+  categoryId  String
+  category    ParameterCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name        String
+  description String?
+  active      Boolean           @default(true)
+  order       Int               @default(0)
+  metadata    Json?
+  deletedAt   DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([categoryId, name])
+  @@map("parameter_items")
+}

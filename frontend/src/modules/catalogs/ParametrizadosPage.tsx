@@ -1,20 +1,55 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   createCatalogItemRequest,
+  createCategoryRequest,
   deleteCatalogItemRequest,
+  deleteCategoryRequest,
   listCatalogItemsRequest,
+  listCategoriesRequest,
   updateCatalogItemRequest,
 } from './catalogs.api';
 import { CatalogItemForm } from './CatalogItemForm';
-import { CATALOG_KEYS, CATALOG_LABELS, type CatalogItem, type CatalogKey } from './catalogs.types';
+import type { CatalogCategory, CatalogItem, CatalogKey } from './catalogs.types';
 import type { CatalogItemFormValues } from './catalogs.schema';
+import { ApiError } from '../../lib/apiClient';
+
+const ACCENTED_CHARS: Record<string, string> = {
+  a: 'aàáâãäå',
+  e: 'eèéêë',
+  i: 'iìíîï',
+  o: 'oòóôõö',
+  u: 'uùúûü',
+  n: 'nñ',
+  c: 'cç',
+};
+
+function slugify(value: string) {
+  let normalized = value.toLowerCase();
+  for (const [plain, accented] of Object.entries(ACCENTED_CHARS)) {
+    for (const char of accented) {
+      normalized = normalized.split(char).join(plain);
+    }
+  }
+  return normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
 
 export function ParametrizadosPage() {
-  const [activeKey, setActiveKey] = useState<CatalogKey>(CATALOG_KEYS[0]);
+  const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [activeKey, setActiveKey] = useState<CatalogKey | null>(null);
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadCategories(selectKey?: CatalogKey) {
+    const list = await listCategoriesRequest();
+    setCategories(list);
+    const nextKey = selectKey ?? list[0]?.key ?? null;
+    setActiveKey(nextKey);
+  }
 
   async function loadItems(key: CatalogKey) {
     setLoading(true);
@@ -26,50 +61,118 @@ export function ParametrizadosPage() {
   }
 
   useEffect(() => {
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
     setShowForm(false);
     setEditingItem(null);
-    loadItems(activeKey);
+    if (activeKey) {
+      loadItems(activeKey);
+    }
   }, [activeKey]);
 
+  const activeCategory = categories.find((c) => c.key === activeKey) ?? null;
+
   async function handleCreate(values: CatalogItemFormValues) {
+    if (!activeKey) return;
     await createCatalogItemRequest(activeKey, values);
     setShowForm(false);
     await loadItems(activeKey);
   }
 
   async function handleUpdate(values: CatalogItemFormValues) {
-    if (!editingItem) return;
+    if (!editingItem || !activeKey) return;
     await updateCatalogItemRequest(activeKey, editingItem.id, values);
     setEditingItem(null);
     await loadItems(activeKey);
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('¿Eliminar este registro del catalogo?')) return;
+    if (!activeKey || !confirm('¿Eliminar este registro del catalogo?')) return;
     await deleteCatalogItemRequest(activeKey, id);
     await loadItems(activeKey);
+  }
+
+  async function handleCreateCategory(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    const key = slugify(newCategoryName);
+    if (!key) {
+      setError('El nombre del catalogo es requerido');
+      return;
+    }
+    try {
+      await createCategoryRequest({ key, name: newCategoryName });
+      setNewCategoryName('');
+      setShowCategoryForm(false);
+      await loadCategories(key);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo crear el catalogo');
+    }
+  }
+
+  async function handleDeleteCategory() {
+    if (!activeCategory || activeCategory.isSystem) return;
+    if (!confirm(`¿Eliminar el catalogo "${activeCategory.name}"?`)) return;
+    try {
+      await deleteCategoryRequest(activeCategory.key);
+      await loadCategories();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo eliminar el catalogo');
+    }
   }
 
   return (
     <div>
       <div className="page-header">
         <h1>Parametrizados</h1>
-        {!showForm && !editingItem && (
-          <button type="button" onClick={() => setShowForm(true)}>
-            Nuevo registro
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {activeCategory && !activeCategory.isSystem && (
+            <button type="button" onClick={handleDeleteCategory}>
+              Eliminar catalogo
+            </button>
+          )}
+          <button type="button" onClick={() => setShowCategoryForm((v) => !v)}>
+            Nuevo catalogo
           </button>
-        )}
+          {!showForm && !editingItem && activeKey && (
+            <button type="button" onClick={() => setShowForm(true)}>
+              Nuevo registro
+            </button>
+          )}
+        </div>
       </div>
 
+      {showCategoryForm && (
+        <form className="client-form" onSubmit={handleCreateCategory}>
+          <label htmlFor="categoryName">Nombre del catalogo</label>
+          <input
+            id="categoryName"
+            value={newCategoryName}
+            onChange={(e) => setNewCategoryName(e.target.value)}
+            placeholder="Ej: Metodos de pago"
+          />
+          <div className="client-form-actions">
+            <button type="button" onClick={() => setShowCategoryForm(false)}>
+              Cancelar
+            </button>
+            <button type="submit">Crear</button>
+          </div>
+        </form>
+      )}
+
+      {error && <p className="form-error">{error}</p>}
+
       <div className="tabs">
-        {CATALOG_KEYS.map((key) => (
+        {categories.map((category) => (
           <button
-            key={key}
+            key={category.key}
             type="button"
-            className={key === activeKey ? 'tab active' : 'tab'}
-            onClick={() => setActiveKey(key)}
+            className={category.key === activeKey ? 'tab active' : 'tab'}
+            onClick={() => setActiveKey(category.key)}
           >
-            {CATALOG_LABELS[key]}
+            {category.name}
           </button>
         ))}
       </div>
