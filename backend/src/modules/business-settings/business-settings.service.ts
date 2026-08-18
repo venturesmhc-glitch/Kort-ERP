@@ -1,4 +1,4 @@
-import type { BusinessSettings as BusinessSettingsRow } from '@prisma/client';
+import type { BusinessSettings as BusinessSettingsRow, Role } from '@prisma/client';
 import type { BusinessSettings } from '@kort/shared';
 import { prisma } from '../../lib/prisma.js';
 
@@ -14,8 +14,24 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
   return toConfig(row);
 }
 
-export async function updateBusinessSettings(input: BusinessSettings): Promise<BusinessSettings> {
+// La leyenda "powered by" es una configuracion exclusiva de Dev (marca del
+// sistema, no del negocio): si quien edita no es Dev, se ignora cualquier
+// cambio a esos campos y se conserva el valor que ya estaba en la fila,
+// sin importar lo que venga en el body. El frontend tambien oculta el
+// control para Encargado, pero la verificacion real es esta (no confiar
+// solo en el frontend).
+export async function updateBusinessSettings(
+  input: BusinessSettings,
+  role: Role
+): Promise<BusinessSettings> {
   const data = fromConfig(input);
+
+  if (role !== 'DEV') {
+    const current = await prisma.businessSettings.findUnique({ where: { id: 1 } });
+    data.poweredByEnabled = current?.poweredByEnabled ?? data.poweredByEnabled;
+    data.poweredByText = current?.poweredByText ?? data.poweredByText;
+  }
+
   const row = await prisma.businessSettings.upsert({
     where: { id: 1 },
     create: { id: 1, ...data },

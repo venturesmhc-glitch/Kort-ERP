@@ -7,9 +7,12 @@ import { ApiError } from '../../lib/apiClient';
 import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 import { PageSkeleton } from '../../components/AsyncState';
 import { Toggle } from '../../components/Toggle';
+import { useAuth } from '../auth/AuthContext';
 
 export function BusinessSettingsPage() {
   const { settings, loading, refresh } = useBusinessSettings();
+  const { user } = useAuth();
+  const isDev = user?.role === 'DEV';
   const toast = useToast();
   const [values, setValues] = useState<BusinessSettings>(settings);
   const [seeded, setSeeded] = useState(false);
@@ -245,26 +248,36 @@ export function BusinessSettingsPage() {
 
         <h2>Pie de pagina</h2>
 
-        <div className="checkbox-field">
-          <Toggle
-            checked={values.poweredBy.enabled}
-            onChange={(enabled) => setValues((prev) => ({ ...prev, poweredBy: { ...prev.poweredBy, enabled } }))}
-            label='Mostrar leyenda "powered by"'
-          />
-          <span>Mostrar leyenda "powered by"</span>
-        </div>
-
-        {values.poweredBy.enabled && (
+        {isDev ? (
           <>
-            <label htmlFor="poweredByText">Texto</label>
-            <input
-              id="poweredByText"
-              value={values.poweredBy.text ?? ''}
-              onChange={(e) =>
-                setValues((prev) => ({ ...prev, poweredBy: { ...prev.poweredBy, text: e.target.value } }))
-              }
-            />
+            <div className="checkbox-field">
+              <Toggle
+                checked={values.poweredBy.enabled}
+                onChange={(enabled) => setValues((prev) => ({ ...prev, poweredBy: { ...prev.poweredBy, enabled } }))}
+                label='Mostrar leyenda "powered by"'
+              />
+              <span>Mostrar leyenda "powered by"</span>
+            </div>
+
+            {values.poweredBy.enabled && (
+              <>
+                <label htmlFor="poweredByText">Texto</label>
+                <input
+                  id="poweredByText"
+                  value={values.poweredBy.text ?? ''}
+                  onChange={(e) =>
+                    setValues((prev) => ({ ...prev, poweredBy: { ...prev.poweredBy, text: e.target.value } }))
+                  }
+                />
+              </>
+            )}
           </>
+        ) : (
+          <p className="text-muted">
+            Leyenda &quot;powered by&quot;:{' '}
+            {values.poweredBy.enabled ? `activada ("${values.poweredBy.text}")` : 'desactivada'}. Esta
+            configuracion es exclusiva del rol Dev.
+          </p>
         )}
 
         <div className="client-form-actions">
