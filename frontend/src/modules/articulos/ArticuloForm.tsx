@@ -135,20 +135,36 @@ export function ArticuloForm({
       />
       {getFieldError(issues, 'precio') && <p className="form-error">{getFieldError(issues, 'precio')}</p>}
 
-      <label htmlFor="umbralStockBajo">Umbral de stock bajo (opcional)</label>
+      <label htmlFor="stockMinimo">Stock minimo (opcional)</label>
       <input
-        id="umbralStockBajo"
+        id="stockMinimo"
         type="number"
         min="0"
         step="1"
-        value={values.umbralStockBajo ?? ''}
+        value={values.stockMinimo ?? ''}
         onChange={(e) => {
           const raw = e.target.value;
-          setValues((prev) => ({ ...prev, umbralStockBajo: raw === '' ? undefined : Number(raw) }));
+          setValues((prev) => ({ ...prev, stockMinimo: raw === '' ? undefined : Number(raw) }));
         }}
       />
-      {getFieldError(issues, 'umbralStockBajo') && (
-        <p className="form-error">{getFieldError(issues, 'umbralStockBajo')}</p>
+      {getFieldError(issues, 'stockMinimo') && (
+        <p className="form-error">{getFieldError(issues, 'stockMinimo')}</p>
+      )}
+
+      <label htmlFor="stockCritico">Stock critico (opcional)</label>
+      <input
+        id="stockCritico"
+        type="number"
+        min="0"
+        step="1"
+        value={values.stockCritico ?? ''}
+        onChange={(e) => {
+          const raw = e.target.value;
+          setValues((prev) => ({ ...prev, stockCritico: raw === '' ? undefined : Number(raw) }));
+        }}
+      />
+      {getFieldError(issues, 'stockCritico') && (
+        <p className="form-error">{getFieldError(issues, 'stockCritico')}</p>
       )}
 
       {!isEditing && (

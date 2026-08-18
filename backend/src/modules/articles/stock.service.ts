@@ -1,6 +1,8 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
+import { getOrganizationSettings } from '../settings/settings.service.js';
+import { PurchaseOrdersService } from '../purchase-orders/purchase-orders.service.js';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -35,6 +37,15 @@ async function applyMovement(
       data: { stock: nextStock },
     });
     await tx.stockMovement.create({ data: { articleId, type, quantity, reason } });
+
+    // Plan Integral: si el movimiento dejo el articulo bajo stockMinimo,
+    // genera/actualiza el borrador de orden de compra en la misma
+    // transaccion (ver PurchaseOrdersService.syncDraftForArticle) - asi la
+    // deteccion es atomica con la venta/ajuste que la disparo.
+    const settings = await getOrganizationSettings(tx);
+    if (settings.plan === 'INTEGRAL') {
+      await PurchaseOrdersService.syncDraftForArticle(articleId, tx);
+    }
 
     return updated;
   };

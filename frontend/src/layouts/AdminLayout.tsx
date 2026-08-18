@@ -1,12 +1,15 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../modules/auth/AuthContext';
 import { ThemeToggle } from '../components/ThemeToggle';
 import type { Role } from '../modules/auth/auth.types';
+import { listStockBajoRequest } from '../modules/articulos/articulos.api';
 
 interface NavItem {
   to: string;
   label: string;
   roles: Role[];
+  badgeKey?: 'stockBajo';
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -14,17 +17,32 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/admin/clientes', label: 'Clientes', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
   { to: '/admin/turnos', label: 'Turnos y horarios', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
   { to: '/admin/cortes', label: 'Registro de cortes', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
-  { to: '/admin/articulos', label: 'Articulos y stock', roles: ['DEV', 'ENCARGADO'] },
+  { to: '/admin/articulos', label: 'Articulos y stock', roles: ['DEV', 'ENCARGADO'], badgeKey: 'stockBajo' },
   { to: '/admin/ventas', label: 'Ventas', roles: ['DEV', 'ENCARGADO'] },
   { to: '/admin/tesoreria', label: 'Tesoreria', roles: ['DEV', 'ENCARGADO'] },
   { to: '/admin/parametrizados', label: 'Parametrizados', roles: ['DEV', 'ENCARGADO'] },
   { to: '/admin/usuarios', label: 'Usuarios', roles: ['DEV', 'ENCARGADO'] },
   { to: '/admin/jornadas', label: 'Jornadas laborales', roles: ['DEV', 'ENCARGADO'] },
   { to: '/admin/estadisticas', label: 'Estadisticas', roles: ['DEV', 'ENCARGADO'] },
+  // Plan Integral: visible a los 3 roles (el gating es por plan, no por rol,
+  // ver PlanGate).
+  { to: '/admin/proveedores', label: 'Proveedores', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
+  { to: '/admin/ordenes-compra', label: 'Ordenes de compra', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
+  { to: '/admin/reportes', label: 'Reportes', roles: ['DEV', 'ENCARGADO', 'BARBERO'] },
+  { to: '/admin/plan', label: 'Plan', roles: ['DEV'] },
 ];
 
 export function AdminLayout() {
   const { user, logout } = useAuth();
+  const canSeeStock = user?.role === 'DEV' || user?.role === 'ENCARGADO';
+  const [stockBajoCount, setStockBajoCount] = useState(0);
+
+  useEffect(() => {
+    if (!canSeeStock) return;
+    listStockBajoRequest()
+      .then((articulos) => setStockBajoCount(articulos.length))
+      .catch(() => undefined);
+  }, [canSeeStock]);
 
   const visibleItems = NAV_ITEMS.filter((item) => user && item.roles.includes(user.role));
 
@@ -42,7 +60,10 @@ export function AdminLayout() {
               end={item.to === '/admin'}
               className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
             >
-              {item.label}
+              <span>{item.label}</span>
+              {item.badgeKey === 'stockBajo' && stockBajoCount > 0 && (
+                <span className="nav-badge">{stockBajoCount}</span>
+              )}
             </NavLink>
           ))}
         </nav>

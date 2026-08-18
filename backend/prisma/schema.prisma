@@ -188,21 +188,27 @@ enum StockMovementType {
 
 // Modulo Articulos y Stock: stock es un contador cacheado, actualizado en la
 // misma transaccion que cada StockMovement (ver StockService).
+// stockMinimo/stockCritico alimentan las alertas de stock (Plan Integral,
+// ver PurchaseOrdersService.syncDraftForArticle): bajo minimo = alerta
+// amarilla, bajo critico = alerta roja y dispara borrador de compra.
 model Article {
-  id                String          @id @default(uuid())
-  name              String
-  description       String?
-  tipoProductoId    String
-  tipoProducto      ParameterItem   @relation(fields: [tipoProductoId], references: [id])
-  price             Int
-  imageUrl          String?
-  stock             Int             @default(0)
-  lowStockThreshold Int?
-  active            Boolean         @default(true)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  movements         StockMovement[]
-  saleItems         SaleItem[]
+  id              String              @id @default(uuid())
+  name            String
+  description     String?
+  tipoProductoId  String
+  tipoProducto    ParameterItem       @relation(fields: [tipoProductoId], references: [id])
+  price           Int
+  imageUrl        String?
+  stock           Int                 @default(0)
+  stockMinimo     Int?
+  stockCritico    Int?
+  active          Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  movements       StockMovement[]
+  saleItems       SaleItem[]
+  proveedores     ProveedorProducto[]
+  ordenItems      OrdenCompraItem[]
 
   @@map("articles")
 }
@@ -340,4 +346,105 @@ model TreasuryEntry {
   createdAt       DateTime             @default(now())
 
   @@map("treasury_entries")
+}
+
+enum Plan {
+  BASICO
+  INTEGRAL
+}
+
+// Modulo Plan Integral: fila unica por instalacion (mismo patron singleton
+// que AppointmentSettings). No hay multi-tenancy real de datos - cada
+// barberia es un deploy propio, este flag solo prende/apaga las
+// funcionalidades premium (proveedores, ordenes de compra, reportes). Lo
+// setea el rol DEV desde /admin/plan.
+model OrganizationSettings {
+  id        Int      @id @default(1)
+  plan      Plan     @default(BASICO)
+  updatedAt DateTime @updatedAt
+
+  @@map("organization_settings")
+}
+
+// Modulo Proveedores (Plan Integral): un proveedor puede vender varios
+// articulos y un articulo puede tener varios proveedores con distinto
+// precio (ver ProveedorProducto). Soft delete via active, mismo patron que
+// Article.
+model Proveedor {
+  id              String              @id @default(uuid())
+  nombre          String
+  contacto        String?
+  telefono        String?
+  email           String?
+  condicionesPago String?
+  active          Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  productos ProveedorProducto[]
+  ordenes   OrdenCompra[]
+
+  @@map("proveedores")
+}
+
+// Relacion N:M Proveedor-Articulo con precio de costo propio de cada
+// proveedor. esPreferido desempata (junto con precioCosto asc) al sugerir
+// proveedor en las ordenes de compra automaticas.
+model ProveedorProducto {
+  id                String    @id @default(uuid())
+  proveedorId       String
+  proveedor         Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+  articleId         String
+  article           Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  precioCosto       Int
+  tiempoEntregaDias Int?
+  esPreferido       Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([proveedorId, articleId])
+  @@map("proveedor_productos")
+}
+
+enum OrdenCompraEstado {
+  BORRADOR
+  CONFIRMADA
+  ENVIADA
+  RECIBIDA
+}
+
+// Modulo Ordenes de compra (Plan Integral): el borrador se genera solo
+// (ver PurchaseOrdersService.syncDraftForArticle, enganchado en
+// StockService.applyMovement) cuando un articulo cruza stockMinimo y tiene
+// al menos un ProveedorProducto cargado. Edicion manual solo permitida en
+// BORRADOR; RECIBIDA da de alta el stock via StockService.increaseStock.
+model OrdenCompra {
+  id                String            @id @default(uuid())
+  proveedorId       String
+  proveedor         Proveedor         @relation(fields: [proveedorId], references: [id])
+  estado            OrdenCompraEstado @default(BORRADOR)
+  total             Int               @default(0)
+  fechaConfirmacion DateTime?
+  fechaEnvio        DateTime?
+  fechaRecepcion    DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  items OrdenCompraItem[]
+
+  @@map("ordenes_compra")
+}
+
+model OrdenCompraItem {
+  id             String      @id @default(uuid())
+  ordenId        String
+  orden          OrdenCompra @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  articleId      String
+  article        Article     @relation(fields: [articleId], references: [id])
+  cantidad       Int
+  precioUnitario Int
+  createdAt      DateTime    @default(now())
+
+  @@unique([ordenId, articleId])
+  @@map("orden_compra_items")
 }

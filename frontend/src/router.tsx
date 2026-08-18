@@ -18,6 +18,11 @@ import { LandingHomePage } from './modules/landing/LandingHomePage';
 import { ContactPage } from './modules/landing/ContactPage';
 import { TurnoWizardPage } from './modules/public-turnos/TurnoWizardPage';
 import { StorePage } from './modules/public-store/StorePage';
+import { SuppliersPage } from './modules/suppliers/SuppliersPage';
+import { PurchaseOrdersPage } from './modules/purchase-orders/PurchaseOrdersPage';
+import { PurchaseOrderDetailPage } from './modules/purchase-orders/PurchaseOrderDetailPage';
+import { ReportsPage } from './modules/reports/ReportsPage';
+import { PlanSettingsPage } from './modules/plan/PlanSettingsPage';
 
 export const router = createBrowserRouter([
   {
@@ -44,6 +49,13 @@ export const router = createBrowserRouter([
           { path: 'clientes', element: <ClientsPage /> },
           { path: 'turnos', element: <TurnosPage /> },
           { path: 'cortes', element: <CortesPage /> },
+          // Plan Integral: rutas accesibles a cualquier rol logueado (incluido
+          // Barbero) - el gating real es por plan, no por rol (ver PlanGate
+          // dentro de cada pagina y requirePlan.ts en el backend).
+          { path: 'proveedores', element: <SuppliersPage /> },
+          { path: 'ordenes-compra', element: <PurchaseOrdersPage /> },
+          { path: 'ordenes-compra/:id', element: <PurchaseOrderDetailPage /> },
+          { path: 'reportes', element: <ReportsPage /> },
           {
             element: <ProtectedRoute allowedRoles={['DEV', 'ENCARGADO']} />,
             children: [
@@ -55,6 +67,10 @@ export const router = createBrowserRouter([
               { path: 'jornadas', element: <JornadasPage /> },
               { path: 'estadisticas', element: <EstadisticasPage /> },
             ],
+          },
+          {
+            element: <ProtectedRoute allowedRoles={['DEV']} />,
+            children: [{ path: 'plan', element: <PlanSettingsPage /> }],
           },
         ],
       },

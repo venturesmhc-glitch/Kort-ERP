@@ -11,7 +11,8 @@ interface ArticleDto {
   price: number;
   imageUrl: string | null;
   stock: number;
-  lowStockThreshold: number | null;
+  stockMinimo: number | null;
+  stockCritico: number | null;
 }
 
 interface MovementDto {
@@ -31,7 +32,8 @@ function toArticulo(dto: ArticleDto): Articulo {
     tipoProductoNombre: dto.tipoProducto.name,
     precio: dto.price,
     stock: dto.stock,
-    umbralStockBajo: dto.lowStockThreshold ?? undefined,
+    stockMinimo: dto.stockMinimo ?? undefined,
+    stockCritico: dto.stockCritico ?? undefined,
     imagenUrl: dto.imageUrl ?? undefined,
   };
 }
@@ -73,7 +75,8 @@ export async function createArticuloRequest(input: ArticuloFormValues): Promise<
       description: input.descripcion || undefined,
       tipoProductoId: input.tipoProductoId,
       price: input.precio,
-      lowStockThreshold: input.umbralStockBajo,
+      stockMinimo: input.stockMinimo,
+      stockCritico: input.stockCritico,
       stock: input.stockInicial,
     },
   });
@@ -88,7 +91,8 @@ export async function updateArticuloRequest(id: string, input: ArticuloFormValue
       description: input.descripcion || undefined,
       tipoProductoId: input.tipoProductoId,
       price: input.precio,
-      lowStockThreshold: input.umbralStockBajo,
+      stockMinimo: input.stockMinimo,
+      stockCritico: input.stockCritico,
     },
   });
   return toArticulo(dto);

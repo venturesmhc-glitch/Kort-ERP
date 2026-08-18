@@ -4,7 +4,7 @@ import { listStockBajoRequest } from '../articulos/articulos.api';
 import { listVentasRequest } from '../ventas/ventas.api';
 import { listCortesRequest } from '../cortes/cortes.api';
 import type { Turno } from '../turnos/turnos.types';
-import type { Articulo } from '../articulos/articulos.types';
+import { nivelStock, type Articulo } from '../articulos/articulos.types';
 import { formatCurrency, todayIso } from '../../lib/format';
 import { useAuth } from '../auth/AuthContext';
 import { ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
@@ -112,11 +112,19 @@ export function DashboardPage() {
                   <p className="text-muted">Todo el stock esta en niveles saludables.</p>
                 ) : (
                   <ul className="simple-list">
-                    {stockBajo.map((articulo) => (
-                      <li key={articulo.id}>
-                        {articulo.nombre}: quedan {articulo.stock} unidades
-                      </li>
-                    ))}
+                    {stockBajo.map((articulo) => {
+                      const nivel = nivelStock(articulo);
+                      return (
+                        <li key={articulo.id}>
+                          <span
+                            className={nivel === 'critico' ? 'badge badge-danger' : 'badge badge-warning'}
+                          >
+                            {nivel === 'critico' ? 'Critico' : 'Bajo'}
+                          </span>{' '}
+                          {articulo.nombre}: quedan {articulo.stock} unidades (minimo {articulo.stockMinimo})
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>

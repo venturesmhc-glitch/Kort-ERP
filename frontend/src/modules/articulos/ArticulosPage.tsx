@@ -9,7 +9,7 @@ import {
 } from './articulos.api';
 import { ArticuloForm } from './ArticuloForm';
 import { StockMovementForm } from './StockMovementForm';
-import type { Articulo } from './articulos.types';
+import { nivelStock, type Articulo } from './articulos.types';
 import type { ArticuloFormValues, MovimientoFormValues } from './articulos.schema';
 import { formatCurrency } from '../../lib/format';
 import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
@@ -97,7 +97,8 @@ export function ArticulosPage() {
             tipoProductoId: editingArticulo.tipoProductoId,
             tipoProductoNombre: editingArticulo.tipoProductoNombre,
             precio: editingArticulo.precio,
-            umbralStockBajo: editingArticulo.umbralStockBajo,
+            stockMinimo: editingArticulo.stockMinimo,
+            stockCritico: editingArticulo.stockCritico,
           }}
           initialImagenUrl={editingArticulo.imagenUrl}
           onSubmit={handleUpdate}
@@ -146,9 +147,11 @@ export function ArticulosPage() {
                   <td>
                     <span
                       className={
-                        articulo.umbralStockBajo !== undefined && articulo.stock <= articulo.umbralStockBajo
-                          ? 'badge badge-warning'
-                          : 'badge badge-success'
+                        nivelStock(articulo) === 'critico'
+                          ? 'badge badge-danger'
+                          : nivelStock(articulo) === 'bajo'
+                            ? 'badge badge-warning'
+                            : 'badge badge-success'
                       }
                     >
                       {articulo.stock}

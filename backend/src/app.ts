@@ -19,6 +19,10 @@ import { treasuryRouter } from './modules/treasury/treasury.routes.js';
 import { workshiftsRouter } from './modules/workshifts/workshifts.routes.js';
 import { statsRouter } from './modules/stats/stats.routes.js';
 import { merchRouter, publicMerchRouter } from './modules/merch/merch.routes.js';
+import { settingsRouter } from './modules/settings/settings.routes.js';
+import { suppliersRouter } from './modules/suppliers/suppliers.routes.js';
+import { purchaseOrdersRouter } from './modules/purchase-orders/purchase-orders.routes.js';
+import { reportsRouter } from './modules/reports/reports.routes.js';
 
 export const app = express();
 
@@ -51,8 +55,9 @@ app.use('/api/workshifts', workshiftsRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/merch', merchRouter);
 app.use('/api/public/merch', publicMerchRouter);
-
-// Modulos futuros (dashboard, settings) se montan aca a medida que se
-// implementen.
+app.use('/api/settings', settingsRouter);
+app.use('/api/suppliers', suppliersRouter);
+app.use('/api/purchase-orders', purchaseOrdersRouter);
+app.use('/api/reports', reportsRouter);
 
 app.use(errorHandler);

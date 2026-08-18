@@ -42,7 +42,8 @@ export async function createArticle(input: CreateArticleInput) {
       description: input.description,
       tipoProductoId: input.tipoProductoId,
       price: input.price,
-      lowStockThreshold: input.lowStockThreshold,
+      stockMinimo: input.stockMinimo,
+      stockCritico: input.stockCritico,
       active: input.active ?? true,
       stock: 0,
     },
@@ -75,15 +76,24 @@ export async function deleteArticle(id: string) {
   await prisma.article.update({ where: { id }, data: { active: false } });
 }
 
+// Ordenado por criticidad: primero los que ya cruzaron stockCritico (rojo),
+// despues los que solo cruzaron stockMinimo (amarillo), cada grupo por stock
+// ascendente. El nivel (bajo/critico) lo deriva el frontend comparando
+// stock contra stockMinimo/stockCritico (ver DashboardPage).
 export async function listLowStock() {
   const articles = await prisma.article.findMany({
-    where: { active: true, lowStockThreshold: { not: null } },
+    where: { active: true, stockMinimo: { not: null } },
     include: ARTICLE_INCLUDE,
     orderBy: { stock: 'asc' },
   });
-  return articles.filter(
-    (article) => article.lowStockThreshold !== null && article.stock <= article.lowStockThreshold
+  const bajoMinimo = articles.filter(
+    (article) => article.stockMinimo !== null && article.stock <= article.stockMinimo
   );
+  const critico = bajoMinimo.filter(
+    (article) => article.stockCritico !== null && article.stock <= article.stockCritico
+  );
+  const soloBajo = bajoMinimo.filter((article) => !critico.includes(article));
+  return [...critico, ...soloBajo];
 }
 
 export async function createMovement(articleId: string, input: CreateMovementInput) {
