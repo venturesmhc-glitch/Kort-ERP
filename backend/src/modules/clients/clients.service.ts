@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import type { CreateClientInput, UpdateClientInput } from './clients.schema.js';
@@ -38,7 +39,16 @@ export async function updateClient(id: string, input: UpdateClientInput) {
 
 export async function deleteClient(id: string) {
   await getClient(id);
-  await prisma.client.delete({ where: { id } });
+  try {
+    await prisma.client.delete({ where: { id } });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      throw new ConflictError(
+        'No se puede eliminar: el cliente tiene turnos, cortes o ventas registradas. Podes dejarlo sin borrar o quitar/reasignar ese historial primero.'
+      );
+    }
+    throw error;
+  }
 }
 
 /**
