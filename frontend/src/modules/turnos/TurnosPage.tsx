@@ -10,17 +10,10 @@ import {
   updateTurnoEstadoRequest,
 } from './turnos.api';
 import { HorarioForm } from './HorarioForm';
-import {
-  DIA_LABELS,
-  TURNO_ESTADO_LABELS,
-  type Horario,
-  type HorarioInput,
-  type Turno,
-  type TurnoEstado,
-} from './turnos.types';
-import { formatDate } from '../../lib/format';
+import { AgendaTimeline } from './AgendaTimeline';
+import { DIA_LABELS, type Horario, type HorarioInput, type Turno, type TurnoEstado } from './turnos.types';
 import { useAuth } from '../auth/AuthContext';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, Skeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
 
 type Tab = 'agenda' | 'horarios';
@@ -137,66 +130,24 @@ export function TurnosPage() {
       </div>
 
       {loading ? (
-        <LoadingState />
+        <div>
+          <Skeleton style={{ height: 60, marginBottom: 9 }} />
+          <Skeleton style={{ height: 60, marginBottom: 9 }} />
+          <Skeleton style={{ height: 60 }} />
+        </div>
       ) : error ? (
         <ErrorState message={error} />
       ) : tab === 'agenda' ? (
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Codigo</th>
-                <th>Fecha</th>
-                <th>Hora</th>
-                <th>Cliente</th>
-                <th>Barbero</th>
-                <th>Tipo de corte</th>
-                <th>Estado</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {turnos.map((turno) => (
-                <tr key={turno.id}>
-                  <td>{turno.codigo}</td>
-                  <td>{formatDate(turno.fecha)}</td>
-                  <td>{turno.hora}</td>
-                  <td>
-                    {turno.clienteNombre} {turno.clienteApellido} · {turno.clienteTelefono}
-                  </td>
-                  <td>{turno.barberoNombre}</td>
-                  <td>{turno.tipoCorteNombre}</td>
-                  <td>
-                    <select
-                      value={turno.estado}
-                      onChange={(e) => handleEstadoChange(turno.id, e.target.value as TurnoEstado)}
-                    >
-                      {Object.entries(TURNO_ESTADO_LABELS).map(([key, label]) => (
-                        <option key={key} value={key}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="data-table-actions">
-                    {turno.estado !== 'cancelado' && turno.estado !== 'completado' && (
-                      <button type="button" onClick={() => handleEstadoChange(turno.id, 'cancelado')}>
-                        Cancelar
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {turnos.length === 0 && (
-                <tr>
-                  <td colSpan={8}>
-                    <EmptyState message="No hay turnos solicitados todavia." />
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        turnos.length === 0 ? (
+          <EmptyState message="No hay turnos solicitados todavia." />
+        ) : (
+          <AgendaTimeline
+            turnos={turnos}
+            horarios={horarios}
+            slotMinutos={slotMinutos ?? 30}
+            onEstadoChange={handleEstadoChange}
+          />
+        )
       ) : (
         <div>
           {canManageSchedules && slotMinutos !== null && (

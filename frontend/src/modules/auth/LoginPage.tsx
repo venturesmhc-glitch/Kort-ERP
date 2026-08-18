@@ -41,32 +41,58 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
-        <h1>Kort</h1>
-        <p className="login-subtitle">Ingresa a tu panel</p>
+        <div className="login-brand">
+          <span className="login-brand-mark" aria-hidden="true" />
+          <span className="login-brand-name">Kort</span>
+        </div>
 
-        <label htmlFor="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="username"
-        />
+        <div className="login-heading">
+          <h1>Acceso del equipo</h1>
+          <p className="login-subtitle">Ingresa con la cuenta que te asigno el encargado del local.</p>
+        </div>
 
-        <label htmlFor="password">Contrasena</label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-        />
+        <div className="login-fields">
+          <label className="login-field" htmlFor="email">
+            <span>Email</span>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
+            />
+          </label>
 
-        {error && <p className="login-error">{error}</p>}
+          <label className="login-field" htmlFor="password">
+            <span>Contrasena</span>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </label>
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Ingresando...' : 'Ingresar'}
-        </button>
+          <div className="login-remember">
+            <span>Mantener sesion iniciada</span>
+            <span className="toggle-track on" aria-hidden="true">
+              <span className="toggle-knob" />
+            </span>
+          </div>
+
+          {error && <p className="login-error">{error}</p>}
+
+          <button type="submit" className="button-primary button-block" disabled={loading}>
+            {loading ? 'Ingresando...' : 'Ingresar'}
+          </button>
+
+          <p className="login-forgot">Olvide mi contrasena</p>
+        </div>
+
+        <p className="login-footnote">
+          Los clientes no pasan por esta pantalla: reservan desde su link y van directo al turno.
+        </p>
       </form>
     </div>
   );

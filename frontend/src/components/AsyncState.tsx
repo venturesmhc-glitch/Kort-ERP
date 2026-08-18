@@ -1,5 +1,11 @@
+import type { CSSProperties } from 'react';
+
 export function LoadingState() {
   return <p className="text-muted">Cargando...</p>;
+}
+
+export function Skeleton({ className = '', style }: { className?: string; style?: CSSProperties }) {
+  return <div className={`skeleton ${className}`.trim()} style={style} />;
 }
 
 export function ErrorState({ message }: { message: string }) {
