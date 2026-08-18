@@ -198,23 +198,29 @@ export function AdminLayout() {
       </aside>
 
       <div className="admin-content">
-        <header className="admin-header">
-          <div>
-            <h1 className="admin-header-title">{pageTitleFor(location.pathname)}</h1>
-            <p className="admin-header-subtitle">{DATE_LABEL}</p>
-          </div>
-          <div className="admin-header-actions">
-            <NavLink to="/" className="button-secondary">
-              Ver sitio publico
-            </NavLink>
-            <button type="button" className="button-secondary" onClick={toggleTheme}>
-              {theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
-            </button>
-            <button type="button" className="button-secondary" onClick={logout}>
-              Cerrar sesion
-            </button>
-          </div>
-        </header>
+        {
+          // La Agenda arma su propio encabezado (turnos de hoy, % de
+          // ocupacion, accesos rapidos) que reemplaza a este generico.
+          !location.pathname.startsWith('/admin/turnos') && (
+            <header className="admin-header">
+              <div>
+                <h1 className="admin-header-title">{pageTitleFor(location.pathname)}</h1>
+                <p className="admin-header-subtitle">{DATE_LABEL}</p>
+              </div>
+              <div className="admin-header-actions">
+                <NavLink to="/" className="button-secondary">
+                  Ver sitio publico
+                </NavLink>
+                <button type="button" className="button-secondary" onClick={toggleTheme}>
+                  {theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
+                </button>
+                <button type="button" className="button-secondary" onClick={logout}>
+                  Cerrar sesion
+                </button>
+              </div>
+            </header>
+          )
+        }
 
         <main className="admin-main">
           <Outlet />

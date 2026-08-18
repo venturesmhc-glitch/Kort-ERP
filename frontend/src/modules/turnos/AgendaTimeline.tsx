@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { listBarberosRequest } from '../users/users.api';
 import type { AppUser } from '../users/users.types';
-import { DIAS_SEMANA, TURNO_ESTADO_LABELS, type Horario, type Turno, type TurnoEstado } from './turnos.types';
-import { nowMinutes, timeToMinutes } from './agenda.utils';
+import { TURNO_ESTADO_LABELS, type Horario, type Turno, type TurnoEstado } from './turnos.types';
+import { diaSemanaFromIso, nowMinutes, timeToMinutes } from './agenda.utils';
 import { formatDate, shiftIso, todayIso } from '../../lib/format';
 import { EmptyState } from '../../components/AsyncState';
 
@@ -15,13 +15,6 @@ interface AgendaTimelineProps {
   horarios: Horario[];
   slotMinutos: number;
   onEstadoChange: (id: string, estado: TurnoEstado) => Promise<void>;
-}
-
-function diaSemanaFromIso(fecha: string) {
-  const [y, m, d] = fecha.split('-').map(Number);
-  const jsDay = new Date(y, m - 1, d).getDay(); // 0 = domingo
-  const index = (jsDay + 6) % 7; // 0 = lunes
-  return DIAS_SEMANA[index];
 }
 
 function computeFreeGaps(rangeStart: number, rangeEnd: number, occupied: [number, number][], minGap: number) {

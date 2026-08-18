@@ -727,7 +727,13 @@ button:disabled {
   filter: none;
 }
 
-button[type='button']:not(.theme-toggle) {
+/* Reset generico para <button type="button"> sueltos (Cancelar, Editar...)
+   que no llevan una clase de componente propia. A proposito NO usa
+   :not(.theme-toggle): un selector con :not(.clase) suma la especificidad
+   de esa clase (0,2,1 en vez de 0,1,1), lo que le ganaba a cualquier
+   .algo.active de dos clases (0,2,0) e impedia que el estado
+   seleccionado de wizard-slot, agenda-pill, mobile-tab, etc. se viera. */
+button[type='button'] {
   background-color: transparent;
   color: var(--color-text);
   border: 1px solid var(--color-border-strong);
@@ -847,6 +853,19 @@ button[type='button']:not(.theme-toggle) {
   justify-content: space-between;
   margin-bottom: 1rem;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page-header-subtitle {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.page-header-actions {
+  display: flex;
+  gap: 9px;
+  align-items: center;
   flex-wrap: wrap;
 }
 
@@ -1532,6 +1551,30 @@ button[type='button']:not(.theme-toggle) {
 /* ---------------------------------------------------------------------- */
 /* Agenda: timeline por profesional                                        */
 /* ---------------------------------------------------------------------- */
+
+.agenda-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.agenda-layout-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.agenda-side {
+  width: 284px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 900px) {
+  .agenda-side {
+    display: none;
+  }
+}
 
 .agenda-toolbar {
   display: flex;
