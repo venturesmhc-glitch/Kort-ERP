@@ -85,6 +85,14 @@
   font-weight: 700;
 }
 
+.sidebar-logo-image {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 9px;
+  object-fit: cover;
+}
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -1140,6 +1148,27 @@ button[type='button'] {
   border-radius: 12px;
   border: 1px solid var(--color-border);
   margin-bottom: 0.75rem;
+}
+
+.image-upload-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.business-settings-url-fallback {
+  margin: 0.5rem 0 1.25rem;
+}
+
+.business-settings-url-fallback summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.business-settings-url-fallback label {
+  margin-top: 0.75rem;
 }
 
 .chart-svg {

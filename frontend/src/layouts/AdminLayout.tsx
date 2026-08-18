@@ -4,6 +4,7 @@ import { useAuth } from '../modules/auth/AuthContext';
 import { useTheme } from '../theme/ThemeProvider';
 import type { Role } from '../modules/auth/auth.types';
 import { listStockBajoRequest } from '../modules/articulos/articulos.api';
+import { useBusinessSettings } from '../modules/business-settings/BusinessSettingsContext';
 import {
   IconHome,
   IconCalendar,
@@ -103,12 +104,16 @@ function pageTitleFor(pathname: string) {
 export function AdminLayout() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { settings } = useBusinessSettings();
   const location = useLocation();
   const canSeeStock = user?.role === 'DEV' || user?.role === 'ENCARGADO';
   const [stockBajoCount, setStockBajoCount] = useState(0);
   const [accountOpen, setAccountOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
+  const [logoBroken, setLogoBroken] = useState(false);
+
+  useEffect(() => setLogoBroken(false), [settings.logoUrl]);
 
   useEffect(() => {
     if (!canSeeStock) return;
@@ -132,7 +137,16 @@ export function AdminLayout() {
     <div className="admin-layout">
       <aside className="admin-sidebar" aria-label="Navegacion principal">
         <NavLink to="/admin" end className="sidebar-logo">
-          <span className="sidebar-logo-mark">K</span>
+          {settings.logoUrl && !logoBroken ? (
+            <img
+              src={settings.logoUrl}
+              alt=""
+              className="sidebar-logo-image"
+              onError={() => setLogoBroken(true)}
+            />
+          ) : (
+            <span className="sidebar-logo-mark">K</span>
+          )}
           <span className="sidebar-label">Kort</span>
         </NavLink>
 

@@ -1,13 +1,45 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import type { BusinessSettings } from '@kort/shared';
 import { useBusinessSettings } from './BusinessSettingsContext';
-import { updateBusinessSettingsRequest } from './business-settings.api';
+import {
+  updateBusinessSettingsRequest,
+  uploadBusinessImageRequest,
+  type BusinessImageField,
+} from './business-settings.api';
 import { useToast } from '../../components/toast/ToastProvider';
 import { ApiError } from '../../lib/apiClient';
 import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 import { PageSkeleton } from '../../components/AsyncState';
 import { Toggle } from '../../components/Toggle';
 import { useAuth } from '../auth/AuthContext';
+
+interface ImageUploadFieldProps {
+  label: string;
+  currentUrl: string | undefined;
+  uploading: boolean;
+  onSelect: (file: File) => void;
+}
+
+function ImageUploadField({ label, currentUrl, uploading, onSelect }: ImageUploadFieldProps) {
+  function handleChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) onSelect(file);
+  }
+
+  return (
+    <div className="image-upload-field">
+      <label>{label}</label>
+      {currentUrl ? (
+        <img src={currentUrl} alt={label} className="image-upload-preview" />
+      ) : (
+        <p className="text-muted">Sin imagen configurada.</p>
+      )}
+      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleChange} disabled={uploading} />
+      {uploading && <span className="text-muted">Subiendo...</span>}
+    </div>
+  );
+}
 
 export function BusinessSettingsPage() {
   const { settings, loading, refresh } = useBusinessSettings();
@@ -18,6 +50,30 @@ export function BusinessSettingsPage() {
   const [seeded, setSeeded] = useState(false);
   const [issues, setIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState<Record<BusinessImageField, boolean>>({
+    logo: false,
+    header: false,
+    footer: false,
+  });
+
+  async function handleImageUpload(field: BusinessImageField, file: File) {
+    setUploading((prev) => ({ ...prev, [field]: true }));
+    try {
+      const updated = await uploadBusinessImageRequest(field, file);
+      setValues((prev) => ({
+        ...prev,
+        logoUrl: updated.logoUrl,
+        headerImageUrl: updated.headerImageUrl,
+        footerImageUrl: updated.footerImageUrl,
+      }));
+      await refresh();
+      toast.success('Imagen actualizada');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'No se pudo subir la imagen'));
+    } finally {
+      setUploading((prev) => ({ ...prev, [field]: false }));
+    }
+  }
 
   // El provider carga los datos una sola vez al arrancar la app; recien acá
   // podemos copiarlos al estado local editable del form.
@@ -74,26 +130,53 @@ export function BusinessSettingsPage() {
           onChange={(e) => setValues((prev) => ({ ...prev, tagline: e.target.value }))}
         />
 
-        <label htmlFor="logoUrl">URL del logo (opcional)</label>
-        <input
-          id="logoUrl"
-          value={values.logoUrl ?? ''}
-          onChange={(e) => setValues((prev) => ({ ...prev, logoUrl: e.target.value }))}
+        <ImageUploadField
+          label="Logo (opcional)"
+          currentUrl={values.logoUrl}
+          uploading={uploading.logo}
+          onSelect={(file) => handleImageUpload('logo', file)}
+        />
+        <ImageUploadField
+          label="Imagen de portada (opcional)"
+          currentUrl={values.headerImageUrl}
+          uploading={uploading.header}
+          onSelect={(file) => handleImageUpload('header', file)}
+        />
+        <ImageUploadField
+          label="Imagen de pie (opcional)"
+          currentUrl={values.footerImageUrl}
+          uploading={uploading.footer}
+          onSelect={(file) => handleImageUpload('footer', file)}
         />
 
-        <label htmlFor="headerImageUrl">URL de imagen de portada (opcional)</label>
-        <input
-          id="headerImageUrl"
-          value={values.headerImageUrl ?? ''}
-          onChange={(e) => setValues((prev) => ({ ...prev, headerImageUrl: e.target.value }))}
-        />
+        <details className="business-settings-url-fallback">
+          <summary>O pegar una URL externa en vez de subir un archivo</summary>
+          <p className="text-muted">
+            Queda a tu cargo que la URL sea estable en el tiempo (ej. no se recomienda usar links
+            de servicios que puedan borrarla).
+          </p>
 
-        <label htmlFor="footerImageUrl">URL de imagen de pie (opcional)</label>
-        <input
-          id="footerImageUrl"
-          value={values.footerImageUrl ?? ''}
-          onChange={(e) => setValues((prev) => ({ ...prev, footerImageUrl: e.target.value }))}
-        />
+          <label htmlFor="logoUrl">URL del logo</label>
+          <input
+            id="logoUrl"
+            value={values.logoUrl ?? ''}
+            onChange={(e) => setValues((prev) => ({ ...prev, logoUrl: e.target.value }))}
+          />
+
+          <label htmlFor="headerImageUrl">URL de imagen de portada</label>
+          <input
+            id="headerImageUrl"
+            value={values.headerImageUrl ?? ''}
+            onChange={(e) => setValues((prev) => ({ ...prev, headerImageUrl: e.target.value }))}
+          />
+
+          <label htmlFor="footerImageUrl">URL de imagen de pie</label>
+          <input
+            id="footerImageUrl"
+            value={values.footerImageUrl ?? ''}
+            onChange={(e) => setValues((prev) => ({ ...prev, footerImageUrl: e.target.value }))}
+          />
+        </details>
 
         <h2>Contacto</h2>
 

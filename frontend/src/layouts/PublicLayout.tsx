@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useBusinessSettings } from '../modules/business-settings/BusinessSettingsContext';
@@ -10,6 +11,14 @@ export function PublicLayout() {
   const { name, logoUrl, headerImageUrl, footerImageUrl, badge, poweredBy } = settings;
   const year = new Date().getFullYear();
 
+  // Si la URL de logo/footer es invalida o el recurso cae, mostramos un
+  // fallback (nombre del negocio, u ocultar directamente) en vez del icono
+  // de imagen rota del navegador.
+  const [logoBroken, setLogoBroken] = useState(false);
+  const [footerImageBroken, setFooterImageBroken] = useState(false);
+  useEffect(() => setLogoBroken(false), [logoUrl]);
+  useEffect(() => setFooterImageBroken(false), [footerImageUrl]);
+
   return (
     <div className="public-shell">
       <header
@@ -19,8 +28,13 @@ export function PublicLayout() {
         {headerImageUrl && <div className="public-header-overlay" aria-hidden="true" />}
         <div className="public-header-content">
           <NavLink to="/" end className="public-brand">
-            {logoUrl ? (
-              <img src={logoUrl} alt={name} className="public-logo-image" />
+            {logoUrl && !logoBroken ? (
+              <img
+                src={logoUrl}
+                alt={name}
+                className="public-logo-image"
+                onError={() => setLogoBroken(true)}
+              />
             ) : (
               <span className="public-logo">{name}</span>
             )}
@@ -49,7 +63,14 @@ export function PublicLayout() {
       </main>
 
       <footer className="public-footer">
-        {footerImageUrl && <img src={footerImageUrl} alt={name} className="public-footer-image" />}
+        {footerImageUrl && !footerImageBroken && (
+          <img
+            src={footerImageUrl}
+            alt={name}
+            className="public-footer-image"
+            onError={() => setFooterImageBroken(true)}
+          />
+        )}
         <p>
           {name} — {year}
         </p>
