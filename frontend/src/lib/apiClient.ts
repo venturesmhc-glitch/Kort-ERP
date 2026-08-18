@@ -1,6 +1,37 @@
 const API_URL = import.meta.env.VITE_API_URL;
 const TOKEN_KEY = 'kort-token';
 
+// El backend esta en Render plan free: si no tuvo trafico en ~15 min el
+// servicio "duerme" y la primera request tarda 30-50s en responder mientras
+// arranca de nuevo. 60s da margen a ese cold start sin dejar una request
+// colgada para siempre si el backend esta realmente caido.
+const REQUEST_TIMEOUT_MS = 60_000;
+
+// status 0 identifica errores de red/timeout (no una respuesta HTTP real),
+// asi la UI puede distinguir "credenciales invalidas" de "el backend esta
+// arrancando o no responde" y mostrar un mensaje/retry acorde.
+export function isColdStartError(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 0;
+}
+
+async function fetchWithTimeout(input: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError(
+        'El sistema esta iniciando y tardo demasiado en responder. Espera unos segundos y volve a intentar.',
+        0
+      );
+    }
+    throw new ApiError('No se pudo conectar con el servidor. Revisa tu conexion e intenta de nuevo.', 0);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -49,7 +80,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetchWithTimeout(`${API_URL}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
@@ -77,7 +108,7 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetchWithTimeout(`${API_URL}${path}`, {
     method: 'POST',
     headers,
     body: formData,
@@ -108,7 +139,7 @@ export async function apiDownload(path: string, fallbackFilename: string): Promi
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${path}`, { headers });
+  const response = await fetchWithTimeout(`${API_URL}${path}`, { headers });
 
   if (!response.ok) {
     const data = await response.json().catch(() => undefined);

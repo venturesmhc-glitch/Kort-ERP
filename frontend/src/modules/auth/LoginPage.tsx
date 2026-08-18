@@ -2,12 +2,18 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from './AuthContext';
-import { ApiError } from '../../lib/apiClient';
+import { ApiError, isColdStartError } from '../../lib/apiClient';
 
 const loginFormSchema = z.object({
   email: z.string().email('Ingresa un email valido'),
   password: z.string().min(1, 'Ingresa tu contrasena'),
 });
+
+// Si el backend estaba dormido (Render free tier), el primer intento puede
+// haber tardado tanto que el cliente lo dio por perdido. Reintentamos un par
+// de veces en vez de mostrar directo un error de red generico: para cuando
+// llega el 2do/3er intento el servicio ya deberia estar despierto.
+const COLD_START_RETRIES = 2;
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -16,10 +22,12 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    setStarting(false);
 
     const parsed = loginFormSchema.safeParse({ email, password });
     if (!parsed.success) {
@@ -29,12 +37,24 @@ export function LoginPage() {
 
     setLoading(true);
     try {
-      await login(parsed.data.email, parsed.data.password);
-      navigate('/admin');
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          await login(parsed.data.email, parsed.data.password);
+          navigate('/admin');
+          return;
+        } catch (err) {
+          if (isColdStartError(err) && attempt < COLD_START_RETRIES) {
+            setStarting(true);
+            continue;
+          }
+          throw err;
+        }
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo iniciar sesion');
     } finally {
       setLoading(false);
+      setStarting(false);
     }
   }
 
@@ -82,9 +102,12 @@ export function LoginPage() {
           </div>
 
           {error && <p className="login-error">{error}</p>}
+          {starting && !error && (
+            <p className="login-hint">El sistema esta iniciando, puede tardar unos segundos...</p>
+          )}
 
           <button type="submit" className="button-primary button-block" disabled={loading}>
-            {loading ? 'Ingresando...' : 'Ingresar'}
+            {starting ? 'Iniciando sistema...' : loading ? 'Ingresando...' : 'Ingresar'}
           </button>
 
           <p className="login-forgot">Olvide mi contrasena</p>
