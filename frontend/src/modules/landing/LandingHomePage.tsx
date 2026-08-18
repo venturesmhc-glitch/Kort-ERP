@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
-import { businessConfig } from '../../config/business.config';
+import { useBusinessSettings } from '../business-settings/BusinessSettingsContext';
 
 export function LandingHomePage() {
+  const { settings } = useBusinessSettings();
+
   return (
     <div>
       <section className="public-hero">
-        <h1>Reserva tu turno en {businessConfig.name}</h1>
-        <p>{businessConfig.tagline}</p>
+        <h1>Reserva tu turno en {settings.name}</h1>
+        <p>{settings.tagline}</p>
         <div className="public-hero-actions">
           <Link to="/turnos" className="button-primary">
             Solicitar turno

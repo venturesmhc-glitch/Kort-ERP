@@ -23,6 +23,7 @@ import { PurchaseOrdersPage } from './modules/purchase-orders/PurchaseOrdersPage
 import { PurchaseOrderDetailPage } from './modules/purchase-orders/PurchaseOrderDetailPage';
 import { ReportsPage } from './modules/reports/ReportsPage';
 import { PlanSettingsPage } from './modules/plan/PlanSettingsPage';
+import { BusinessSettingsPage } from './modules/business-settings/BusinessSettingsPage';
 
 export const router = createBrowserRouter([
   {
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
               { path: 'usuarios', element: <UsersPage /> },
               { path: 'jornadas', element: <JornadasPage /> },
               { path: 'estadisticas', element: <EstadisticasPage /> },
+              { path: 'negocio', element: <BusinessSettingsPage /> },
             ],
           },
           {

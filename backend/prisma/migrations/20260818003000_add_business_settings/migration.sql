@@ -1,0 +1,32 @@
+-- CreateTable
+CREATE TABLE "business_settings" (
+    "id" INTEGER NOT NULL DEFAULT 1,
+    "name" TEXT NOT NULL DEFAULT 'Mi Barberia',
+    "tagline" TEXT NOT NULL DEFAULT '',
+    "logoUrl" TEXT,
+    "headerImageUrl" TEXT,
+    "footerImageUrl" TEXT,
+    "poweredByEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "poweredByText" TEXT NOT NULL DEFAULT 'Sistema de gestion por Kort',
+    "badgeEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "badgeText" TEXT,
+    "badgeColor" TEXT,
+    "badgeIcon" TEXT,
+    "contactAddress" TEXT,
+    "contactPhone" TEXT,
+    "contactWhatsapp" TEXT,
+    "contactEmail" TEXT,
+    "contactHours" TEXT,
+    "socialInstagram" TEXT,
+    "socialFacebook" TEXT,
+    "socialTiktok" TEXT,
+    "themePrimary" TEXT NOT NULL DEFAULT '#1d4ed8',
+    "themeSecondary" TEXT NOT NULL DEFAULT '#0f172a',
+    "themeBackground" TEXT NOT NULL DEFAULT '#ffffff',
+    "themeText" TEXT NOT NULL DEFAULT '#1a1d21',
+    "themeAccent" TEXT NOT NULL DEFAULT '#dc2626',
+    "themeMode" TEXT NOT NULL DEFAULT 'light',
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "business_settings_pkey" PRIMARY KEY ("id")
+);

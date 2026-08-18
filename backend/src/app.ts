@@ -23,6 +23,10 @@ import { settingsRouter } from './modules/settings/settings.routes.js';
 import { suppliersRouter } from './modules/suppliers/suppliers.routes.js';
 import { purchaseOrdersRouter } from './modules/purchase-orders/purchase-orders.routes.js';
 import { reportsRouter } from './modules/reports/reports.routes.js';
+import {
+  businessSettingsRouter,
+  publicBusinessSettingsRouter,
+} from './modules/business-settings/business-settings.routes.js';
 
 export const app = express();
 
@@ -59,5 +63,7 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/purchase-orders', purchaseOrdersRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/business-settings', businessSettingsRouter);
+app.use('/api/public/business-settings', publicBusinessSettingsRouter);
 
 app.use(errorHandler);

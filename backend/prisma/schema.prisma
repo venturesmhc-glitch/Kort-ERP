@@ -435,6 +435,45 @@ model OrdenCompra {
   @@map("ordenes_compra")
 }
 
+// Modulo Landing publica: nombre, contacto y tema de marca del tenant. Fila
+// unica (id fijo en 1), mismo patron singleton que OrganizationSettings/
+// AppointmentSettings. Reemplaza el config que vivia hardcodeado en el
+// frontend (business.config.ts): con eso, personalizar una instalacion
+// implicaba tocar codigo y redeployar, lo cual no escala a multi-tenant.
+// Editable desde /admin/negocio (Dev y Encargado), lectura publica sin auth
+// (la landing no tiene sesion) via publicBusinessSettingsRouter.
+model BusinessSettings {
+  id               Int      @id @default(1)
+  name             String   @default("Mi Barberia")
+  tagline          String   @default("")
+  logoUrl          String?
+  headerImageUrl   String?
+  footerImageUrl   String?
+  poweredByEnabled Boolean  @default(true)
+  poweredByText    String   @default("Sistema de gestion por Kort")
+  badgeEnabled     Boolean  @default(false)
+  badgeText        String?
+  badgeColor       String?
+  badgeIcon        String?
+  contactAddress   String?
+  contactPhone     String?
+  contactWhatsapp  String?
+  contactEmail     String?
+  contactHours     String?
+  socialInstagram  String?
+  socialFacebook   String?
+  socialTiktok     String?
+  themePrimary     String   @default("#1d4ed8")
+  themeSecondary   String   @default("#0f172a")
+  themeBackground  String   @default("#ffffff")
+  themeText        String   @default("#1a1d21")
+  themeAccent      String   @default("#dc2626")
+  themeMode        String   @default("light")
+  updatedAt        DateTime @updatedAt
+
+  @@map("business_settings")
+}
+
 model OrdenCompraItem {
   id             String      @id @default(uuid())
   ordenId        String

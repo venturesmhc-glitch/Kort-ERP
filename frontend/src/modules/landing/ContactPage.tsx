@@ -1,4 +1,4 @@
-import { businessConfig } from '../../config/business.config';
+import { useBusinessSettings } from '../business-settings/BusinessSettingsContext';
 
 function toWhatsappLink(whatsapp: string) {
   const digits = whatsapp.replace(/[^\d]/g, '');
@@ -36,7 +36,8 @@ function SocialIcon({ kind }: { kind: 'instagram' | 'facebook' | 'tiktok' }) {
 }
 
 export function ContactPage() {
-  const { name, contact } = businessConfig;
+  const { settings } = useBusinessSettings();
+  const { name, contact } = settings;
   const { address, phone, whatsapp, email, hours, socials } = contact;
   const hasSocials = socials && (socials.instagram || socials.facebook || socials.tiktok);
 

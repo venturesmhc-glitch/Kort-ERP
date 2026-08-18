@@ -1,12 +1,13 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { ThemeToggle } from '../components/ThemeToggle';
-import { businessConfig } from '../config/business.config';
+import { useBusinessSettings } from '../modules/business-settings/BusinessSettingsContext';
 import { useBusinessTheme } from '../config/useBusinessTheme';
 
 export function PublicLayout() {
   useBusinessTheme();
+  const { settings } = useBusinessSettings();
 
-  const { name, logoUrl, headerImageUrl, footerImageUrl, badge, poweredBy } = businessConfig;
+  const { name, logoUrl, headerImageUrl, footerImageUrl, badge, poweredBy } = settings;
   const year = new Date().getFullYear();
 
   return (
