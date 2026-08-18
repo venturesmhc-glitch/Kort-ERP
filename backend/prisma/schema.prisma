@@ -487,3 +487,51 @@ model OrdenCompraItem {
   @@unique([ordenId, articleId])
   @@map("orden_compra_items")
 }
+
+// Los primeros dos tipos (PERCENTAGE/FIXED_AMOUNT) descuentan sobre el total
+// del carrito; ITEM_PERCENTAGE/ITEM_FIXED_AMOUNT existen para dejar explicito
+// en el dato que el cupon fue pensado para un subconjunto de items/categorias
+// (ver applicableItems/applicableCategories mas abajo). El switch de calculo
+// (DiscountsService.calculateDiscount) queda preparado para sumar FREE_SHIPPING
+// y BUNDLE a futuro sin romper lo existente.
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  ITEM_PERCENTAGE
+  ITEM_FIXED_AMOUNT
+}
+
+// Modulo Descuentos: codigos de cupon reutilizables en Ventas/Merch. code se
+// normaliza siempre a mayusculas al guardar (ver discounts.service.ts) para
+// poder comparar case-insensitive sin depender de citext. value se interpreta
+// como % entero (tipos *_PERCENTAGE) o monto entero en la moneda del sistema
+// (tipos *_FIXED_AMOUNT), mismo criterio Int que Article.price. applicableItems
+// (ids de Article) y applicableCategories (ids de ParameterItem de la
+// categoria "tipos-producto") acotan el subtotal sobre el que se calcula el
+// descuento; ambos vacios = se calcula sobre el total del carrito. usesCount
+// se incrementa solo cuando el cupon se aplica a una compra confirmada (no en
+// cada validacion) - la integracion con Ventas/Merch queda para cuando ese
+// flujo exista. Soft delete via deletedAt: un cupon ya usado no se borra
+// fisico, para no perder trazabilidad en ventas historicas.
+model Discount {
+  id                   String       @id @default(uuid())
+  code                 String       @unique
+  name                 String
+  type                 DiscountType
+  value                Int
+  maxDiscountAmount    Int?
+  minOrderAmount       Int?
+  maxUses              Int?
+  maxUsesPerUser       Int?
+  usesCount            Int          @default(0)
+  applicableItems      String[]     @default([])
+  applicableCategories String[]     @default([])
+  validFrom            DateTime?
+  validUntil           DateTime?
+  isActive             Boolean      @default(true)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  deletedAt            DateTime?
+
+  @@map("discounts")
+}
