@@ -10,6 +10,7 @@ import { formatCurrency } from '../../lib/format';
 import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
 import { CategoryCarousel, type CarouselItem } from '../../components/CategoryCarousel';
+import { loadTurnoDraft } from '../public-turnos/turno-wizard.types';
 
 const EMPTY_CLIENTE: MerchClienteInput = { nombre: '', apellido: '', telefono: '', email: '' };
 
@@ -21,7 +22,13 @@ export function StorePage() {
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [tipos, setTipos] = useState<CatalogItem[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [cliente, setCliente] = useState<MerchClienteInput>(EMPTY_CLIENTE);
+  const [cliente, setCliente] = useState<MerchClienteInput>(() => {
+    if (vieneDeTurno) {
+      const draft = loadTurnoDraft();
+      if (draft) return draft.cliente;
+    }
+    return EMPTY_CLIENTE;
+  });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
