@@ -12,7 +12,8 @@ import type { CatalogItem } from '../catalogs/catalogs.types';
 import { listPublicBarberosRequest } from '../users/users.api';
 import type { PublicBarbero } from '../users/users.types';
 import { formatCurrency, todayIso } from '../../lib/format';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
+import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/toast/ToastProvider';
 import { PlanGate } from '../../components/PlanGate';
 
@@ -136,7 +137,7 @@ function ReportsPageContent() {
         </div>
 
         {loading ? (
-          <LoadingState />
+          <PageSkeleton />
         ) : error ? (
           <ErrorState message={error} />
         ) : (
@@ -162,17 +163,11 @@ function ReportsPageContent() {
                     <td>{row.stockMinimo ?? '-'}</td>
                     <td>{row.stockCritico ?? '-'}</td>
                     <td>
-                      <span
-                        className={
-                          row.nivel === 'critico'
-                            ? 'badge badge-danger'
-                            : row.nivel === 'bajo'
-                              ? 'badge badge-warning'
-                              : 'badge badge-success'
-                        }
+                      <StatusBadge
+                        tone={row.nivel === 'critico' ? 'danger' : row.nivel === 'bajo' ? 'warning' : 'success'}
                       >
                         {NIVEL_LABEL[row.nivel]}
-                      </span>
+                      </StatusBadge>
                     </td>
                     <td>{formatCurrency(row.precio)}</td>
                   </tr>

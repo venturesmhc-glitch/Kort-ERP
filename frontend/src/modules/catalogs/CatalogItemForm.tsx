@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { catalogItemFormSchema, type CatalogItemFormValues } from './catalogs.schema';
+import { Toggle } from '../../components/Toggle';
 import { useToast } from '../../components/toast/ToastProvider';
 import { ApiError } from '../../lib/apiClient';
 import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
@@ -85,14 +86,14 @@ export function CatalogItemForm({
         </>
       )}
 
-      <label className="checkbox-field">
-        <input
-          type="checkbox"
+      <div className="checkbox-field">
+        <Toggle
           checked={values.activo}
-          onChange={(e) => setValues((prev) => ({ ...prev, activo: e.target.checked }))}
+          onChange={(activo) => setValues((prev) => ({ ...prev, activo }))}
+          label="Activo"
         />
-        Activo
-      </label>
+        <span>Activo</span>
+      </div>
 
       <div className="client-form-actions">
         <button type="button" onClick={onCancel} disabled={saving}>

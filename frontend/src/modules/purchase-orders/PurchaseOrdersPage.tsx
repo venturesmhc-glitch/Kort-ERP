@@ -5,7 +5,8 @@ import type { OrdenCompra, OrdenCompraEstado } from './purchase-orders.types';
 import { listSuppliersRequest } from '../suppliers/suppliers.api';
 import type { Supplier } from '../suppliers/suppliers.types';
 import { formatCurrency } from '../../lib/format';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
+import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/toast/ToastProvider';
 import { PlanGate } from '../../components/PlanGate';
 
@@ -92,7 +93,7 @@ function PurchaseOrdersPageContent() {
       </div>
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : error ? (
         <ErrorState message={error} />
       ) : (
@@ -113,9 +114,9 @@ function PurchaseOrdersPageContent() {
                 <tr key={orden.id}>
                   <td>{orden.proveedorNombre}</td>
                   <td>
-                    <span className={orden.estado === 'BORRADOR' ? 'badge badge-warning' : 'badge badge-success'}>
+                    <StatusBadge tone={orden.estado === 'BORRADOR' ? 'warning' : 'success'}>
                       {ESTADO_LABEL[orden.estado]}
-                    </span>
+                    </StatusBadge>
                   </td>
                   <td>{orden.items.length}</td>
                   <td>{formatCurrency(orden.total)}</td>

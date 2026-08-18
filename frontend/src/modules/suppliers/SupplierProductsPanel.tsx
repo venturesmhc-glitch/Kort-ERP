@@ -8,6 +8,7 @@ import {
   type ArticleCatalogItem,
 } from './suppliers.api';
 import { formatCurrency } from '../../lib/format';
+import { Toggle } from '../../components/Toggle';
 import { useToast } from '../../components/toast/ToastProvider';
 import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 import { ApiError } from '../../lib/apiClient';
@@ -150,14 +151,14 @@ export function SupplierProductsPanel({ supplier, onChanged }: SupplierProductsP
           }}
         />
 
-        <label>
-          <input
-            type="checkbox"
+        <div className="checkbox-field">
+          <Toggle
             checked={values.esPreferido ?? false}
-            onChange={(e) => setValues((prev) => ({ ...prev, esPreferido: e.target.checked }))}
-          />{' '}
-          Proveedor preferido para este articulo
-        </label>
+            onChange={(esPreferido) => setValues((prev) => ({ ...prev, esPreferido }))}
+            label="Proveedor preferido para este articulo"
+          />
+          <span>Proveedor preferido para este articulo</span>
+        </div>
 
         <div className="client-form-actions">
           <button type="submit" disabled={saving}>

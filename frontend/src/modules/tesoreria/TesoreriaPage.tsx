@@ -12,7 +12,7 @@ import { MOVIMIENTO_SOURCE_LABELS, MOVIMIENTO_TIPO_LABELS, type Movimiento, type
 import type { MovimientoFormValues } from './tesoreria.schema';
 import { BarChart } from '../../components/BarChart';
 import { formatCurrency, formatDate, todayIso, toLocalIso } from '../../lib/format';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
 
 function inicioDeMes() {
@@ -129,7 +129,7 @@ export function TesoreriaPage() {
       </div>
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : error ? (
         <ErrorState message={error} />
       ) : !totals || !breakeven ? null : (

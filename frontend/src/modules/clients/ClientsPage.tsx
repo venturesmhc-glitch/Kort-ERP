@@ -8,7 +8,7 @@ import {
 import { ClientForm } from './ClientForm';
 import type { Client } from './clients.types';
 import type { ClientFormValues } from './clients.schema';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
 import { useAuth } from '../auth/AuthContext';
 
@@ -90,46 +90,48 @@ export function ClientsPage() {
       )}
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : error ? (
         <ErrorState message={error} />
       ) : (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Apellido</th>
-              <th>Telefono</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((client) => (
-              <tr key={client.id}>
-                <td>{client.firstName}</td>
-                <td>{client.lastName}</td>
-                <td>{client.phone}</td>
-                <td className="data-table-actions">
-                  <button type="button" onClick={() => setEditingClient(client)}>
-                    Editar
-                  </button>
-                  {canDelete && (
-                    <button type="button" onClick={() => handleDelete(client.id)}>
-                      Eliminar
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {clients.length === 0 && (
+        <div className="table-wrap table-wrap--cards">
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan={4}>
-                  <EmptyState message="No hay clientes cargados todavia." />
-                </td>
+                <th>Nombre</th>
+                <th>Apellido</th>
+                <th>Telefono</th>
+                <th></th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {clients.map((client) => (
+                <tr key={client.id}>
+                  <td data-label="Nombre">{client.firstName}</td>
+                  <td data-label="Apellido">{client.lastName}</td>
+                  <td data-label="Telefono">{client.phone}</td>
+                  <td className="data-table-actions" data-label="">
+                    <button type="button" onClick={() => setEditingClient(client)}>
+                      Editar
+                    </button>
+                    {canDelete && (
+                      <button type="button" onClick={() => handleDelete(client.id)}>
+                        Eliminar
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {clients.length === 0 && (
+                <tr>
+                  <td colSpan={4} data-label="">
+                    <EmptyState message="No hay clientes cargados todavia." />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

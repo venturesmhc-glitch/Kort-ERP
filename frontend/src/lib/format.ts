@@ -39,3 +39,20 @@ export function formatDate(iso: string): string {
   if (Number.isNaN(date.getTime())) return iso;
   return dateFormatter.format(date);
 }
+
+/** Desplaza una fecha "yyyy-mm-dd" una cantidad de dias (puede ser negativa). */
+export function shiftIso(fecha: string, days: number): string {
+  const [year, month, day] = fecha.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  return toLocalIso(date);
+}
+
+/** Diferencia en dias entre dos fechas "yyyy-mm-dd" (a - b). */
+export function diffDaysIso(a: string, b: string): number {
+  const [ay, am, ad] = a.split('-').map(Number);
+  const [by, bm, bd] = b.split('-').map(Number);
+  const dateA = new Date(ay, am - 1, ad);
+  const dateB = new Date(by, bm - 1, bd);
+  return Math.round((dateA.getTime() - dateB.getTime()) / 86400000);
+}

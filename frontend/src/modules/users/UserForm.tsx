@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { userFormSchema, type UserFormValues } from './users.schema';
 import { useAuth } from '../auth/AuthContext';
 import type { Role } from '../auth/auth.types';
+import { Toggle } from '../../components/Toggle';
 import { useToast } from '../../components/toast/ToastProvider';
 import { ApiError } from '../../lib/apiClient';
 import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
@@ -160,14 +161,14 @@ export function UserForm({
         <p className="form-error">{getFieldError(issues, 'password')}</p>
       )}
 
-      <label className="checkbox-field">
-        <input
-          type="checkbox"
+      <div className="checkbox-field">
+        <Toggle
           checked={values.active}
-          onChange={(e) => setValues((prev) => ({ ...prev, active: e.target.checked }))}
+          onChange={(active) => setValues((prev) => ({ ...prev, active }))}
+          label="Activo"
         />
-        Activo
-      </label>
+        <span>Activo</span>
+      </div>
 
       <div className="client-form-actions">
         <button type="button" onClick={onCancel} disabled={saving}>

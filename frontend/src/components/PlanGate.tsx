@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { usePlan } from '../modules/plan/PlanContext';
 import { useAuth } from '../modules/auth/AuthContext';
-import { LoadingState } from './AsyncState';
+import { PageSkeleton } from './AsyncState';
 
 interface PlanGateProps {
   children: ReactNode;
@@ -20,7 +20,7 @@ export function PlanGate({ children, feature = 'Esta funcionalidad' }: PlanGateP
   const { user } = useAuth();
 
   if (loading) {
-    return <LoadingState />;
+    return <PageSkeleton />;
   }
 
   if (isIntegral) {

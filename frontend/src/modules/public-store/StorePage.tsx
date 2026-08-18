@@ -7,7 +7,7 @@ import type { CatalogItem } from '../catalogs/catalogs.types';
 import { checkoutMerchRequest, type MerchClienteInput } from './merch.api';
 import { savePendingMerchSaleId, type CartItem } from './store.types';
 import { formatCurrency } from '../../lib/format';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
 import { CategoryCarousel, type CarouselItem } from '../../components/CategoryCarousel';
 
@@ -146,7 +146,7 @@ export function StorePage() {
       )}
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : loadError ? (
         <ErrorState message={loadError} />
       ) : (

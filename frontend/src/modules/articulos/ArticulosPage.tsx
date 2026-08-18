@@ -12,7 +12,8 @@ import { StockMovementForm } from './StockMovementForm';
 import { nivelStock, type Articulo } from './articulos.types';
 import type { ArticuloFormValues, MovimientoFormValues } from './articulos.schema';
 import { formatCurrency } from '../../lib/format';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
+import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/toast/ToastProvider';
 
 export function ArticulosPage() {
@@ -115,11 +116,11 @@ export function ArticulosPage() {
       )}
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : error ? (
         <ErrorState message={error} />
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap table-wrap--cards">
           <table className="data-table">
             <thead>
               <tr>
@@ -134,30 +135,30 @@ export function ArticulosPage() {
             <tbody>
               {articulos.map((articulo) => (
                 <tr key={articulo.id}>
-                  <td>
+                  <td data-label="">
                     {articulo.imagenUrl ? (
                       <img src={articulo.imagenUrl} alt={articulo.nombre} className="row-thumb" />
                     ) : (
                       <span className="row-thumb row-thumb-empty">Sin img.</span>
                     )}
                   </td>
-                  <td>{articulo.nombre}</td>
-                  <td>{articulo.tipoProductoNombre}</td>
-                  <td>{formatCurrency(articulo.precio)}</td>
-                  <td>
-                    <span
-                      className={
+                  <td data-label="Nombre">{articulo.nombre}</td>
+                  <td data-label="Tipo">{articulo.tipoProductoNombre}</td>
+                  <td data-label="Precio">{formatCurrency(articulo.precio)}</td>
+                  <td data-label="Stock">
+                    <StatusBadge
+                      tone={
                         nivelStock(articulo) === 'critico'
-                          ? 'badge badge-danger'
+                          ? 'danger'
                           : nivelStock(articulo) === 'bajo'
-                            ? 'badge badge-warning'
-                            : 'badge badge-success'
+                            ? 'warning'
+                            : 'success'
                       }
                     >
                       {articulo.stock}
-                    </span>
+                    </StatusBadge>
                   </td>
-                  <td className="data-table-actions">
+                  <td className="data-table-actions" data-label="">
                     <button type="button" onClick={() => setMovementArticulo(articulo)}>
                       Movimiento
                     </button>
@@ -172,7 +173,7 @@ export function ArticulosPage() {
               ))}
               {articulos.length === 0 && (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={6} data-label="">
                     <EmptyState message="No hay articulos cargados todavia." />
                   </td>
                 </tr>

@@ -11,7 +11,7 @@ import type { OrdenCompra } from './purchase-orders.types';
 import { listArticlesCatalogRequest, listSuppliersRequest, type ArticleCatalogItem } from '../suppliers/suppliers.api';
 import type { Supplier } from '../suppliers/suppliers.types';
 import { formatCurrency } from '../../lib/format';
-import { ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
 import { PlanGate } from '../../components/PlanGate';
 
@@ -112,7 +112,7 @@ function PurchaseOrderDetailPageContent() {
     }
   }
 
-  if (loading) return <LoadingState />;
+  if (loading) return <PageSkeleton />;
   if (error || !orden) return <ErrorState message={error ?? 'Orden no encontrada'} />;
 
   const isBorrador = orden.estado === 'BORRADOR';

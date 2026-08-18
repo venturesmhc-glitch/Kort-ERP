@@ -12,7 +12,7 @@ import {
 import { listPublicArticulosRequest } from '../articulos/articulos.api';
 import type { Articulo } from '../articulos/articulos.types';
 import { formatCurrency, formatDate, toLocalIso } from '../../lib/format';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
 
 function fechaHora(iso: string) {
@@ -200,11 +200,11 @@ export function VentasPage() {
       </div>
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : error ? (
         <ErrorState message={error} />
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap table-wrap--cards">
           <table className="data-table">
             <thead>
               <tr>
@@ -218,16 +218,20 @@ export function VentasPage() {
             <tbody>
               {ventas.map((venta) => (
                 <tr key={venta.id}>
-                  <td>{fechaHora(venta.fecha)}</td>
-                  <td>{venta.clienteNombre ?? 'Mostrador'}</td>
-                  <td>{venta.vendedorNombre ?? '-'}</td>
-                  <td>{venta.items.map((item) => `${item.articuloNombre} x${item.cantidad}`).join(', ')}</td>
-                  <td>{formatCurrency(venta.total)}</td>
+                  <td data-label="Fecha">{fechaHora(venta.fecha)}</td>
+                  <td data-label="Cliente">{venta.clienteNombre ?? 'Mostrador'}</td>
+                  <td data-label="Vendedor">{venta.vendedorNombre ?? '-'}</td>
+                  <td data-label="Articulos">
+                    {venta.items.map((item) => `${item.articuloNombre} x${item.cantidad}`).join(', ')}
+                  </td>
+                  <td data-label="Total" className="font-mono">
+                    {formatCurrency(venta.total)}
+                  </td>
                 </tr>
               ))}
               {ventas.length === 0 && (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={5} data-label="">
                     <EmptyState message="No hay ventas registradas todavia." />
                   </td>
                 </tr>

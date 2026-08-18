@@ -6,10 +6,12 @@ import {
   getSaleStatsRequest,
   type StatsFiltros,
 } from './estadisticas.api';
+import { listVentasRequest } from '../ventas/ventas.api';
 import type { BarberStat, ClientStats, CutStats, SaleStats } from './estadisticas.types';
 import { BarChart } from '../../components/BarChart';
-import { formatCurrency, todayIso } from '../../lib/format';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { LineChart } from '../../components/LineChart';
+import { formatCurrency, diffDaysIso, shiftIso, todayIso } from '../../lib/format';
+import { EmptyState, ErrorState, Skeleton, toErrorMessage } from '../../components/AsyncState';
 
 function inicioDeMes() {
   const now = new Date();
@@ -21,6 +23,22 @@ function formatDiaCorto(iso: string) {
   return `${day}/${month}`;
 }
 
+const CHART_COLORS = ['var(--chart-color-1)', 'var(--chart-color-2)', 'var(--chart-color-3)', 'var(--chart-color-4)'];
+
+function buildMix(porTipo: CutStats['porTipo'], total: number) {
+  if (total === 0) return [];
+  const sorted = [...porTipo].sort((a, b) => b.cantidad - a.cantidad);
+  const top = sorted.slice(0, 3);
+  const restCantidad = sorted.slice(3).reduce((sum, t) => sum + t.cantidad, 0);
+  const items = top.map((t) => ({ nombre: t.tipoCorteNombre, cantidad: t.cantidad }));
+  if (restCantidad > 0) items.push({ nombre: 'Otros', cantidad: restCantidad });
+  return items.map((item, i) => ({
+    ...item,
+    pct: Math.round((item.cantidad / total) * 100),
+    color: CHART_COLORS[i] ?? CHART_COLORS[CHART_COLORS.length - 1],
+  }));
+}
+
 export function EstadisticasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +46,8 @@ export function EstadisticasPage() {
   const [barberStats, setBarberStats] = useState<BarberStat[]>([]);
   const [cutStats, setCutStats] = useState<CutStats | null>(null);
   const [saleStats, setSaleStats] = useState<SaleStats | null>(null);
+  const [prevTotalVentas, setPrevTotalVentas] = useState(0);
+  const [ventasCount, setVentasCount] = useState(0);
   const [filtros, setFiltros] = useState<StatsFiltros>({
     fechaDesde: inicioDeMes(),
     fechaHasta: todayIso(),
@@ -37,16 +57,26 @@ export function EstadisticasPage() {
     setLoading(true);
     setError(null);
     try {
-      const [clients, barbers, cuts, sales] = await Promise.all([
+      const desde = activeFiltros.fechaDesde ?? inicioDeMes();
+      const hasta = activeFiltros.fechaHasta ?? todayIso();
+      const rangeDays = Math.max(1, diffDaysIso(hasta, desde) + 1);
+      const prevHasta = shiftIso(desde, -1);
+      const prevDesde = shiftIso(prevHasta, -(rangeDays - 1));
+
+      const [clients, barbers, cuts, sales, ventas, prevSales] = await Promise.all([
         getClientStatsRequest(activeFiltros),
         getBarberStatsRequest(activeFiltros),
         getCutStatsRequest(activeFiltros),
         getSaleStatsRequest(activeFiltros),
+        listVentasRequest({ fechaDesde: desde, fechaHasta: hasta }),
+        getSaleStatsRequest({ fechaDesde: prevDesde, fechaHasta: prevHasta }),
       ]);
       setClientStats(clients);
       setBarberStats(barbers);
       setCutStats(cuts);
       setSaleStats(sales);
+      setVentasCount(ventas.length);
+      setPrevTotalVentas(prevSales.totalVentas);
     } catch (err) {
       setError(toErrorMessage(err, 'No se pudieron cargar las estadisticas.'));
     } finally {
@@ -59,58 +89,122 @@ export function EstadisticasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) {
-    return <LoadingState />;
+  if (error) {
+    return (
+      <div>
+        <div className="page-header">
+          <h1>Estadisticas</h1>
+        </div>
+        <ErrorState message={error} />
+      </div>
+    );
   }
 
-  if (error) {
-    return <ErrorState message={error} />;
+  if (loading) {
+    return (
+      <div>
+        <Skeleton style={{ height: 190, marginBottom: 20 }} />
+        <div className="stats-tiles">
+          <Skeleton style={{ height: 76, flex: 1 }} />
+          <Skeleton style={{ height: 76, flex: 1 }} />
+        </div>
+        <Skeleton style={{ height: 140 }} />
+      </div>
+    );
   }
 
   if (!clientStats || !cutStats || !saleStats) {
     return null;
   }
 
+  const ticketPromedio = ventasCount > 0 ? saleStats.totalVentas / ventasCount : 0;
+  const pctChange =
+    prevTotalVentas > 0
+      ? ((saleStats.totalVentas - prevTotalVentas) / prevTotalVentas) * 100
+      : saleStats.totalVentas > 0
+        ? 100
+        : 0;
+  const mix = buildMix(cutStats.porTipo, cutStats.totalCortes);
+  const serie = saleStats.serieDiaria;
+
   return (
     <div>
       <div className="page-header">
-        <h1>Centro de estadisticas</h1>
+        <h1>Estadisticas</h1>
+        <div className="filters-row">
+          <input
+            id="fechaDesde"
+            type="date"
+            aria-label="Desde"
+            value={filtros.fechaDesde ?? ''}
+            onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value || undefined }))}
+          />
+          <input
+            id="fechaHasta"
+            type="date"
+            aria-label="Hasta"
+            value={filtros.fechaHasta ?? ''}
+            onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value || undefined }))}
+          />
+          <button type="button" className="button-secondary" onClick={() => load(filtros)}>
+            Filtrar
+          </button>
+        </div>
       </div>
 
-      <div className="client-form" style={{ marginBottom: '1rem' }}>
-        <label htmlFor="fechaDesde">Desde</label>
-        <input
-          id="fechaDesde"
-          type="date"
-          value={filtros.fechaDesde ?? ''}
-          onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value || undefined }))}
-        />
-        <label htmlFor="fechaHasta">Hasta</label>
-        <input
-          id="fechaHasta"
-          type="date"
-          value={filtros.fechaHasta ?? ''}
-          onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value || undefined }))}
-        />
-        <button type="button" onClick={() => load(filtros)}>
-          Filtrar
-        </button>
+      <div className="stats-hero">
+        <div className="stats-hero-label">Facturacion del periodo</div>
+        <div className="stats-hero-value">{formatCurrency(saleStats.totalVentas)}</div>
+        <div className="stats-hero-change">
+          <span className={`stats-change-pill ${pctChange >= 0 ? 'up' : 'down'}`}>
+            {pctChange >= 0 ? '+' : ''}
+            {pctChange.toFixed(1)}%
+          </span>
+          <span className="stats-hero-legend">vs periodo anterior</span>
+        </div>
+        {serie.length > 1 && (
+          <>
+            <div className="stats-hero-chart">
+              <LineChart series={serie.map((d) => d.total)} />
+            </div>
+            <div className="stats-hero-axis">
+              <span>{formatDiaCorto(serie[0].date)}</span>
+              <span>{formatDiaCorto(serie[serie.length - 1].date)}</span>
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="stat-row">
-        <div className="stat-tile">
-          <span className="stat-label">Altas de clientes</span>
-          <span className="stat-value">{clientStats.totalAltas}</span>
+      <div className="stats-tiles">
+        <div className="stats-tile">
+          <div className="stats-tile-label">Ticket promedio</div>
+          <div className="stats-tile-value">{formatCurrency(ticketPromedio)}</div>
         </div>
-        <div className="stat-tile">
-          <span className="stat-label">Cortes registrados</span>
-          <span className="stat-value">{cutStats.totalCortes}</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-label">Ventas totales</span>
-          <span className="stat-value">{formatCurrency(saleStats.totalVentas)}</span>
+        <div className="stats-tile">
+          <div className="stats-tile-label">Cortes registrados</div>
+          <div className="stats-tile-value">{cutStats.totalCortes}</div>
         </div>
       </div>
+
+      {mix.length > 0 && (
+        <div className="stats-mix-card">
+          <h2>Mix de servicios</h2>
+          <div className="stats-mix-bar">
+            {mix.map((m) => (
+              <span key={m.nombre} style={{ width: `${m.pct}%`, backgroundColor: m.color }} />
+            ))}
+          </div>
+          <div className="stats-mix-legend">
+            {mix.map((m) => (
+              <div key={m.nombre} className="stats-mix-legend-row">
+                <span className="stats-mix-dot" style={{ backgroundColor: m.color }} />
+                <span className="stats-mix-legend-name">{m.nombre}</span>
+                <span className="stats-mix-legend-pct">{m.pct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card-grid">
         <div className="card">
@@ -134,17 +228,6 @@ export function EstadisticasPage() {
             ]}
             color="var(--color-accent)"
           />
-        </div>
-
-        <div className="card">
-          <h2>Cortes por tipo</h2>
-          {cutStats.porTipo.length > 0 ? (
-            <BarChart
-              data={cutStats.porTipo.map((t) => ({ label: t.tipoCorteNombre, value: t.cantidad }))}
-            />
-          ) : (
-            <p className="text-muted">Todavia no hay cortes registrados.</p>
-          )}
         </div>
 
         <div className="card">
@@ -183,23 +266,10 @@ export function EstadisticasPage() {
             <p className="text-muted">Todavia no hay ventas registradas.</p>
           )}
         </div>
-
-        <div className="card">
-          <h2>Ventas por dia</h2>
-          {saleStats.serieDiaria.length > 0 ? (
-            <BarChart
-              data={saleStats.serieDiaria.map((s) => ({ label: formatDiaCorto(s.date), value: s.total }))}
-              color="var(--color-accent)"
-              formatValue={formatCurrency}
-            />
-          ) : (
-            <p className="text-muted">Todavia no hay ventas registradas.</p>
-          )}
-        </div>
       </div>
 
-      <h2>Barberos</h2>
-      <div className="table-wrap">
+      <h2>Ranking por profesional</h2>
+      <div className="table-wrap table-wrap--cards">
         <table className="data-table">
           <thead>
             <tr>
@@ -212,15 +282,21 @@ export function EstadisticasPage() {
           <tbody>
             {barberStats.map((b) => (
               <tr key={b.barberoId}>
-                <td>{b.barberoNombre}</td>
-                <td>{b.cortesRealizados}</td>
-                <td>{formatCurrency(b.ventasGeneradas)}</td>
-                <td>{b.horasTrabajadas.toFixed(1)} hs</td>
+                <td data-label="Barbero">{b.barberoNombre}</td>
+                <td data-label="Cortes" className="font-mono">
+                  {b.cortesRealizados}
+                </td>
+                <td data-label="Ventas" className="font-mono">
+                  {formatCurrency(b.ventasGeneradas)}
+                </td>
+                <td data-label="Horas" className="font-mono">
+                  {b.horasTrabajadas.toFixed(1)} hs
+                </td>
               </tr>
             ))}
             {barberStats.length === 0 && (
               <tr>
-                <td colSpan={4}>
+                <td colSpan={4} data-label="">
                   <EmptyState message="No hay actividad de barberos en el periodo." />
                 </td>
               </tr>

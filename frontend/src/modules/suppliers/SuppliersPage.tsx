@@ -9,7 +9,7 @@ import { SupplierForm } from './SupplierForm';
 import { SupplierProductsPanel } from './SupplierProductsPanel';
 import type { Supplier } from './suppliers.types';
 import type { SupplierFormValues } from './suppliers.schema';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
 import { PlanGate } from '../../components/PlanGate';
 
@@ -91,7 +91,7 @@ function SuppliersPageContent() {
       )}
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : error ? (
         <ErrorState message={error} />
       ) : (

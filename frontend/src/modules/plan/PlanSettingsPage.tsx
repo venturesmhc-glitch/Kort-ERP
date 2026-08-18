@@ -3,7 +3,7 @@ import { usePlan } from './PlanContext';
 import { updateSettingsRequest } from './plan.api';
 import { useToast } from '../../components/toast/ToastProvider';
 import { getErrorMessage } from '../../lib/apiErrors';
-import { LoadingState } from '../../components/AsyncState';
+import { PageSkeleton } from '../../components/AsyncState';
 import type { Plan } from './plan.types';
 
 export function PlanSettingsPage() {
@@ -36,7 +36,7 @@ export function PlanSettingsPage() {
       </p>
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : (
         <div className="card-grid">
           <button

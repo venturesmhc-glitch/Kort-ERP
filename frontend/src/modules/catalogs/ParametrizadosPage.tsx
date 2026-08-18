@@ -12,7 +12,8 @@ import { CatalogItemForm } from './CatalogItemForm';
 import type { CatalogCategory, CatalogItem, CatalogKey } from './catalogs.types';
 import type { CatalogItemFormValues } from './catalogs.schema';
 import { formatCurrency } from '../../lib/format';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
+import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/toast/ToastProvider';
 import { getErrorMessage } from '../../lib/apiErrors';
 
@@ -218,7 +219,7 @@ export function ParametrizadosPage() {
       )}
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : !loadError ? (
         <div className="table-wrap">
           <table className="data-table">
@@ -238,9 +239,9 @@ export function ParametrizadosPage() {
                   <td>{item.descripcion ?? '-'}</td>
                   {showPrecio && <td>{item.precio !== undefined ? formatCurrency(item.precio) : '-'}</td>}
                   <td>
-                    <span className={item.activo ? 'badge badge-success' : 'badge badge-muted'}>
+                    <StatusBadge tone={item.activo ? 'success' : 'muted'}>
                       {item.activo ? 'Activo' : 'Inactivo'}
-                    </span>
+                    </StatusBadge>
                   </td>
                   <td className="data-table-actions">
                     <button type="button" onClick={() => setEditingItem(item)}>

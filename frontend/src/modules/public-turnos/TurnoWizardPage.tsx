@@ -9,27 +9,66 @@ import type { CatalogItem } from '../catalogs/catalogs.types';
 import { crearTurnoRequest, listSlotsDisponiblesRequest } from '../turnos/turnos.api';
 import type { Turno } from '../turnos/turnos.types';
 import { clearPendingMerchSaleId, loadPendingMerchSaleId } from '../public-store/store.types';
-import { formatDate, todayIso } from '../../lib/format';
-import { ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { formatDate, shiftIso, todayIso } from '../../lib/format';
+import { ErrorState, Skeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
+import { useBusinessSettings } from '../business-settings/BusinessSettingsContext';
+import { useBusinessTheme } from '../../config/useBusinessTheme';
 
 const TODAY = todayIso();
-const STEP_LABELS = ['Tus datos', 'Barbero', 'Horario', 'Tipo de corte', 'Confirmar'];
+const STEP_LABELS = ['Tus datos', 'Profesional', 'Fecha y horario', 'Servicio', 'Confirmar'];
+const DAY_OPTIONS = Array.from({ length: 5 }, (_, i) => shiftIso(TODAY, i));
+const ANY_BARBERO = 'any';
 
 const EMPTY_CLIENTE: ClienteStepFormValues = { nombre: '', apellido: '', telefono: '', email: '' };
 
+function dowShort(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Intl.DateTimeFormat('es-AR', { weekday: 'short' }).format(new Date(y, m - 1, d)).replace('.', '').toUpperCase();
+}
+
+function dayNum(iso: string) {
+  return Number(iso.split('-')[2]);
+}
+
+function initialsOf(firstName: string, lastName: string) {
+  return `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
+}
+
+function buildIcsHref(turno: Turno, businessName: string) {
+  const start = new Date(`${turno.fecha}T${turno.hora}:00`);
+  const end = new Date(start.getTime() + 45 * 60000);
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'BEGIN:VEVENT',
+    `DTSTART:${fmt(start)}`,
+    `DTEND:${fmt(end)}`,
+    `SUMMARY:Turno en ${businessName}`,
+    `DESCRIPTION:${turno.tipoCorteNombre} con ${turno.barberoNombre}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
+}
+
 export function TurnoWizardPage() {
+  useBusinessTheme();
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { settings } = useBusinessSettings();
 
   const [step, setStep] = useState(1);
   const [cliente, setCliente] = useState<ClienteStepFormValues>(EMPTY_CLIENTE);
   const [barberos, setBarberos] = useState<PublicBarbero[]>([]);
   const [barberoId, setBarberoId] = useState('');
   const [barberoNombre, setBarberoNombre] = useState('');
+  const [anyBarbero, setAnyBarbero] = useState(false);
   const [fecha, setFecha] = useState(TODAY);
   const [slots, setSlots] = useState<string[]>([]);
+  const [slotResolution, setSlotResolution] = useState<Record<string, { id: string; nombre: string }>>({});
   const [hora, setHora] = useState('');
   const [tiposCorte, setTiposCorte] = useState<CatalogItem[]>([]);
   const [tipoCorteId, setTipoCorteId] = useState('');
@@ -66,7 +105,39 @@ export function TurnoWizardPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!barberoId || !fecha) {
+    if (!fecha) {
+      setSlots([]);
+      return;
+    }
+    if (anyBarbero) {
+      if (barberos.length === 0) {
+        setSlots([]);
+        return;
+      }
+      Promise.all(
+        barberos.map((b) =>
+          listSlotsDisponiblesRequest(b.id, fecha).then((available) =>
+            available.map((h) => ({ hora: h, id: b.id, nombre: `${b.firstName} ${b.lastName}` }))
+          )
+        )
+      )
+        .then((results) => {
+          const map: Record<string, { id: string; nombre: string }> = {};
+          for (const { hora: h, id, nombre } of results.flat()) {
+            if (!map[h]) map[h] = { id, nombre };
+          }
+          const available = Object.keys(map).sort();
+          setSlots(available);
+          setSlotResolution(map);
+          setHora((current) => (available.includes(current) ? current : ''));
+        })
+        .catch(() => {
+          setSlots([]);
+          setSlotResolution({});
+        });
+      return;
+    }
+    if (!barberoId) {
       setSlots([]);
       return;
     }
@@ -76,7 +147,7 @@ export function TurnoWizardPage() {
         setHora((current) => (available.includes(current) ? current : ''));
       })
       .catch(() => setSlots([]));
-  }, [barberoId, fecha]);
+  }, [barberoId, fecha, anyBarbero, barberos]);
 
   function goToStep(next: number) {
     setError(null);
@@ -92,16 +163,16 @@ export function TurnoWizardPage() {
     goToStep(2);
   }
 
+  function handleHorarioContinue() {
+    if (anyBarbero && slotResolution[hora]) {
+      setBarberoId(slotResolution[hora].id);
+      setBarberoNombre(slotResolution[hora].nombre);
+    }
+    goToStep(4);
+  }
+
   function currentDraft(): TurnoDraft {
-    return {
-      cliente,
-      barberoId,
-      barberoNombre,
-      fecha,
-      hora,
-      tipoCorteId,
-      tipoCorteNombre,
-    };
+    return { cliente, barberoId, barberoNombre, fecha, hora, tipoCorteId, tipoCorteNombre };
   }
 
   function handleVerMercancia() {
@@ -138,216 +209,372 @@ export function TurnoWizardPage() {
   }
 
   if (step === 6 && turnoConfirmado) {
+    const mapsHref = settings.contact.address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(settings.contact.address)}`
+      : null;
+    const whatsappHref = settings.contact.whatsapp
+      ? `https://wa.me/${settings.contact.whatsapp.replace(/[^\d]/g, '')}`
+      : null;
+
     return (
-      <div className="wizard-card">
+      <div className="wizard-done">
+        <div className="wizard-done-check" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M4 10.5l4 4 8-9" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
         <h1>Turno confirmado</h1>
-        <p>
-          Tu codigo de turno es <strong className="turno-code">{turnoConfirmado.codigo}</strong>
+        <div className="wizard-done-block">
+          <div className="wizard-done-code">{turnoConfirmado.codigo}</div>
+          <div className="wizard-done-row">
+            <span>Cuando</span>
+            <span>
+              {formatDate(turnoConfirmado.fecha)} · {turnoConfirmado.hora}
+            </span>
+          </div>
+          <div className="wizard-done-row">
+            <span>Con</span>
+            <span>{turnoConfirmado.barberoNombre}</span>
+          </div>
+          <div className="wizard-done-row">
+            <span>Servicio</span>
+            <span>{turnoConfirmado.tipoCorteNombre}</span>
+          </div>
+        </div>
+        <p className="wizard-done-text">
+          Te mandamos la confirmacion por mail y un recordatorio por WhatsApp 6 horas antes del turno.
         </p>
-        <p>
-          {turnoConfirmado.clienteNombre} {turnoConfirmado.clienteApellido} con{' '}
-          {turnoConfirmado.barberoNombre} el {formatDate(turnoConfirmado.fecha)} a las{' '}
-          {turnoConfirmado.hora} ({turnoConfirmado.tipoCorteNombre}).
-        </p>
-        <p className="text-muted">
-          Te enviamos la confirmacion por mail. Vas a recibir un recordatorio por WhatsApp 6
-          horas antes de tu turno.
-        </p>
-        <button type="button" onClick={() => navigate('/')}>
-          Volver al inicio
-        </button>
+        <div className="wizard-done-actions">
+          <a
+            href={buildIcsHref(turnoConfirmado, settings.name)}
+            download={`turno-${turnoConfirmado.codigo}.ics`}
+            className="button-accent wizard-cta"
+          >
+            Agendar en mi calendario
+          </a>
+          {mapsHref && (
+            <a href={mapsHref} target="_blank" rel="noreferrer" className="wizard-done-outline">
+              Como llegar
+            </a>
+          )}
+          {whatsappHref && (
+            <a href={whatsappHref} target="_blank" rel="noreferrer" className="wizard-done-link">
+              Cancelar o reprogramar por WhatsApp
+            </a>
+          )}
+        </div>
       </div>
     );
   }
 
   if (initialLoading) {
     return (
-      <div className="wizard-card">
-        <LoadingState />
+      <div className="wizard-shell">
+        <div className="wizard-body">
+          <Skeleton style={{ height: 40, marginTop: 20, marginBottom: 16 }} />
+          <Skeleton style={{ height: 60, marginBottom: 9 }} />
+          <Skeleton style={{ height: 60, marginBottom: 9 }} />
+          <Skeleton style={{ height: 60 }} />
+        </div>
       </div>
     );
   }
 
   if (initialError) {
     return (
-      <div className="wizard-card">
-        <ErrorState message={initialError} />
+      <div className="wizard-shell">
+        <div className="wizard-body">
+          <ErrorState message={initialError} />
+        </div>
       </div>
     );
   }
 
+  const manana = slots.filter((s) => s < '14:00');
+  const tarde = slots.filter((s) => s >= '14:00');
+  const continuarConLabel = anyBarbero ? 'Continuar' : barberoNombre ? `Continuar con ${barberoNombre}` : 'Continuar';
+
   return (
-    <div className="wizard-card">
-      <h1>Solicitar turno</h1>
-      <ol className="wizard-steps">
+    <div className="wizard-shell">
+      <div className="wizard-progress">
         {STEP_LABELS.map((label, index) => (
-          <li key={label} className={index + 1 === step ? 'wizard-step active' : 'wizard-step'}>
-            {label}
-          </li>
+          <span key={label} className={`wizard-progress-seg${index + 1 < step ? ' done' : ''}`} />
         ))}
-      </ol>
+      </div>
+      <div className="wizard-progress-label">
+        Paso {step} de {STEP_LABELS.length} · {STEP_LABELS[step - 1]}
+      </div>
 
-      {error && <p className="form-error">{error}</p>}
-
-      {step === 1 && (
-        <div className="client-form">
-          <label htmlFor="nombre">Nombre</label>
-          <input
-            id="nombre"
-            value={cliente.nombre}
-            onChange={(e) => setCliente((prev) => ({ ...prev, nombre: e.target.value }))}
-          />
-          <label htmlFor="apellido">Apellido</label>
-          <input
-            id="apellido"
-            value={cliente.apellido}
-            onChange={(e) => setCliente((prev) => ({ ...prev, apellido: e.target.value }))}
-          />
-          <label htmlFor="telefono">Telefono</label>
-          <input
-            id="telefono"
-            value={cliente.telefono}
-            onChange={(e) => setCliente((prev) => ({ ...prev, telefono: e.target.value }))}
-          />
-          <label htmlFor="email">Email (opcional)</label>
-          <input
-            id="email"
-            type="email"
-            value={cliente.email}
-            onChange={(e) => setCliente((prev) => ({ ...prev, email: e.target.value }))}
-          />
-          <div className="client-form-actions">
-            <button type="button" onClick={handleClienteSubmit}>
-              Continuar
-            </button>
+      {step === 1 ? (
+        <div className="wizard-header">
+          <div className="wizard-header-brand">
+            <span className="wizard-header-mark" aria-hidden="true" />
+            <span className="wizard-header-name">{settings.name}</span>
           </div>
+          {settings.contact.address && <span className="wizard-header-address">{settings.contact.address}</span>}
+        </div>
+      ) : (
+        <div className="wizard-header">
+          <button type="button" className="wizard-header-back" onClick={() => goToStep(step - 1)}>
+            <span className="wizard-header-back-arrow" aria-hidden="true">
+              ←
+            </span>
+            Reserva tu turno
+          </button>
         </div>
       )}
 
-      {step === 2 && (
-        <div>
-          <div className="option-grid">
-            {barberos.map((barbero) => (
+      <div className="wizard-body">
+        {error && <p className="form-error">{error}</p>}
+
+        {step === 1 && (
+          <>
+            <h1>Tus datos</h1>
+            <label className="wizard-field" htmlFor="nombre">
+              <span>Nombre</span>
+              <input
+                id="nombre"
+                value={cliente.nombre}
+                onChange={(e) => setCliente((prev) => ({ ...prev, nombre: e.target.value }))}
+              />
+            </label>
+            <label className="wizard-field" htmlFor="apellido">
+              <span>Apellido</span>
+              <input
+                id="apellido"
+                value={cliente.apellido}
+                onChange={(e) => setCliente((prev) => ({ ...prev, apellido: e.target.value }))}
+              />
+            </label>
+            <label className="wizard-field" htmlFor="telefono">
+              <span>Telefono</span>
+              <input
+                id="telefono"
+                value={cliente.telefono}
+                onChange={(e) => setCliente((prev) => ({ ...prev, telefono: e.target.value }))}
+              />
+            </label>
+            <label className="wizard-field" htmlFor="email">
+              <span>Email (opcional)</span>
+              <input
+                id="email"
+                type="email"
+                placeholder="Para recibir la confirmacion"
+                value={cliente.email}
+                onChange={(e) => setCliente((prev) => ({ ...prev, email: e.target.value }))}
+              />
+            </label>
+            <p className="wizard-note">Te avisamos por WhatsApp 6 horas antes del turno.</p>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <h1>Elegi tu profesional</h1>
+            <div className="wizard-list">
+              {barberos.map((barbero) => {
+                const active = !anyBarbero && barbero.id === barberoId;
+                return (
+                  <button
+                    key={barbero.id}
+                    type="button"
+                    className={`wizard-person-card${active ? ' active' : ''}`}
+                    onClick={() => {
+                      setAnyBarbero(false);
+                      setBarberoId(barbero.id);
+                      setBarberoNombre(`${barbero.firstName} ${barbero.lastName}`);
+                    }}
+                  >
+                    <span className="wizard-person-avatar">{initialsOf(barbero.firstName, barbero.lastName)}</span>
+                    <span className="wizard-person-name">
+                      {barbero.firstName} {barbero.lastName}
+                    </span>
+                    {active && <span className="wizard-person-dot" aria-hidden="true" />}
+                  </button>
+                );
+              })}
               <button
-                key={barbero.id}
                 type="button"
-                className={barbero.id === barberoId ? 'option-card active' : 'option-card'}
+                className={`wizard-person-card dashed${anyBarbero ? ' active' : ''}`}
                 onClick={() => {
-                  setBarberoId(barbero.id);
-                  setBarberoNombre(`${barbero.firstName} ${barbero.lastName}`);
+                  setAnyBarbero(true);
+                  setBarberoId('');
+                  setBarberoNombre('');
                 }}
               >
-                {barbero.firstName} {barbero.lastName}
+                Me da igual — el primero disponible
               </button>
-            ))}
-            {barberos.length === 0 && <p className="text-muted">No hay barberos disponibles.</p>}
-          </div>
-          <div className="client-form-actions">
-            <button type="button" onClick={() => goToStep(1)}>
-              Atras
-            </button>
-            <button type="button" disabled={!barberoId} onClick={() => goToStep(3)}>
-              Continuar
-            </button>
-          </div>
-        </div>
-      )}
+              {barberos.length === 0 && <p className="text-muted">No hay profesionales disponibles.</p>}
+            </div>
+          </>
+        )}
 
-      {step === 3 && (
-        <div>
-          <label htmlFor="fecha">Fecha</label>
-          <input
-            id="fecha"
-            type="date"
-            min={TODAY}
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-          />
+        {step === 3 && (
+          <>
+            <h1>Fecha y horario</h1>
+            <div className="wizard-day-row">
+              {DAY_OPTIONS.map((day) => (
+                <button
+                  key={day}
+                  type="button"
+                  className={`wizard-day${day === fecha ? ' active' : ''}`}
+                  onClick={() => setFecha(day)}
+                >
+                  <div className="dow">{dowShort(day)}</div>
+                  <div className="num">{dayNum(day)}</div>
+                </button>
+              ))}
+            </div>
 
-          <div className="option-grid">
-            {slots.map((slot) => (
-              <button
-                key={slot}
-                type="button"
-                className={slot === hora ? 'option-card active' : 'option-card'}
-                onClick={() => setHora(slot)}
-              >
-                {slot}
-              </button>
-            ))}
-            {slots.length === 0 && (
+            {slots.length === 0 ? (
               <p className="text-muted">No hay horarios disponibles para esa fecha.</p>
+            ) : (
+              <>
+                {manana.length > 0 && (
+                  <>
+                    <div className="wizard-slot-group-label">Manana</div>
+                    <div className="wizard-slot-grid">
+                      {manana.map((slot) => (
+                        <button
+                          key={slot}
+                          type="button"
+                          className={`wizard-slot${slot === hora ? ' active' : ''}`}
+                          onClick={() => setHora(slot)}
+                        >
+                          {slot}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {tarde.length > 0 && (
+                  <>
+                    <div className="wizard-slot-group-label">Tarde</div>
+                    <div className="wizard-slot-grid">
+                      {tarde.map((slot) => (
+                        <button
+                          key={slot}
+                          type="button"
+                          className={`wizard-slot${slot === hora ? ' active' : ''}`}
+                          onClick={() => setHora(slot)}
+                        >
+                          {slot}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             )}
-          </div>
+          </>
+        )}
 
-          <div className="client-form-actions">
-            <button type="button" onClick={() => goToStep(2)}>
-              Atras
-            </button>
-            <button type="button" disabled={!hora} onClick={() => goToStep(4)}>
-              Continuar
-            </button>
-          </div>
-        </div>
-      )}
+        {step === 4 && (
+          <>
+            <h1>Tipo de corte</h1>
+            <div className="wizard-list">
+              {tiposCorte.map((tipo) => (
+                <button
+                  key={tipo.id}
+                  type="button"
+                  className={`wizard-service-card${tipo.id === tipoCorteId ? ' active' : ''}`}
+                  onClick={() => {
+                    setTipoCorteId(tipo.id);
+                    setTipoCorteNombre(tipo.nombre);
+                  }}
+                >
+                  <span className="wizard-service-name">{tipo.nombre}</span>
+                </button>
+              ))}
+              {tiposCorte.length === 0 && <p className="text-muted">No hay tipos de corte cargados.</p>}
+            </div>
+          </>
+        )}
 
-      {step === 4 && (
-        <div>
-          <div className="option-grid">
-            {tiposCorte.map((tipo) => (
-              <button
-                key={tipo.id}
-                type="button"
-                className={tipo.id === tipoCorteId ? 'option-card active' : 'option-card'}
-                onClick={() => {
-                  setTipoCorteId(tipo.id);
-                  setTipoCorteNombre(tipo.nombre);
-                }}
-              >
-                {tipo.nombre}
+        {step === 5 && (
+          <>
+            <h1>Confirma tu turno</h1>
+            <div className="wizard-summary-card">
+              <div className="wizard-summary-row">
+                <span className="wizard-summary-label">Cuando</span>
+                <span>
+                  {formatDate(fecha)} · {hora}
+                </span>
+              </div>
+              <div className="wizard-summary-row">
+                <span className="wizard-summary-label">Con</span>
+                <span>{barberoNombre}</span>
+              </div>
+              <div className="wizard-summary-row">
+                <span className="wizard-summary-label">Servicio</span>
+                <span>{tipoCorteNombre}</span>
+              </div>
+            </div>
+            <p className="text-muted">
+              Se abona en el local. {cliente.nombre} {cliente.apellido} · {cliente.telefono}
+            </p>
+
+            <div className="wizard-upsell">
+              <span>¿Queres ver la tienda de merchandising antes de confirmar?</span>
+              <button type="button" className="button-secondary" onClick={handleVerMercancia} disabled={confirming}>
+                Ver
               </button>
-            ))}
-            {tiposCorte.length === 0 && <p className="text-muted">No hay tipos de corte cargados.</p>}
-          </div>
-          <div className="client-form-actions">
-            <button type="button" onClick={() => goToStep(3)}>
-              Atras
-            </button>
-            <button type="button" disabled={!tipoCorteId} onClick={() => goToStep(5)}>
-              Continuar
-            </button>
-          </div>
-        </div>
-      )}
+            </div>
 
-      {step === 5 && (
-        <div>
-          <div className="card">
-            <h2>Resumen de tu turno</h2>
-            <p>
-              {cliente.nombre} {cliente.apellido} · {cliente.telefono}
+            <p className="wizard-policy">
+              Podes cancelar o reprogramar tu turno hasta 2 horas antes sin costo, escribiendonos por WhatsApp.
             </p>
-            <p>
-              {barberoNombre} · {formatDate(fecha)} a las {hora}
-            </p>
-            <p>{tipoCorteNombre}</p>
-          </div>
+          </>
+        )}
+      </div>
 
-          <p>¿Queres ver la tienda de merchandising antes de confirmar tu turno?</p>
-
-          <div className="client-form-actions">
-            <button type="button" onClick={() => goToStep(4)} disabled={confirming}>
-              Atras
-            </button>
-            <button type="button" onClick={handleVerMercancia} disabled={confirming}>
-              Ver mercancia
-            </button>
-            <button type="button" onClick={handleConfirmar} disabled={confirming}>
+      <div className="wizard-footer">
+        {step === 1 && (
+          <button type="button" className="button-primary wizard-cta" onClick={handleClienteSubmit}>
+            Continuar
+          </button>
+        )}
+        {step === 2 && (
+          <button
+            type="button"
+            className="button-primary wizard-cta"
+            disabled={!barberoId && !anyBarbero}
+            onClick={() => goToStep(3)}
+          >
+            {continuarConLabel}
+          </button>
+        )}
+        {step === 3 && (
+          <button type="button" className="button-primary wizard-cta" disabled={!hora} onClick={handleHorarioContinue}>
+            Continuar · {dowShort(fecha)} {dayNum(fecha)}, {hora || '--:--'}
+          </button>
+        )}
+        {step === 4 && (
+          <button
+            type="button"
+            className="button-primary wizard-cta"
+            disabled={!tipoCorteId}
+            onClick={() => goToStep(5)}
+          >
+            Continuar
+          </button>
+        )}
+        {step === 5 && (
+          <>
+            <button type="button" className="button-primary wizard-cta" onClick={handleConfirmar} disabled={confirming}>
               {confirming ? 'Confirmando...' : 'Confirmar turno'}
             </button>
-          </div>
-        </div>
-      )}
+            <button
+              type="button"
+              className="button-secondary wizard-cta"
+              onClick={() => goToStep(3)}
+              disabled={confirming}
+            >
+              Cambiar horario
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { listJornadasRequest, type ListJornadasFiltros } from './jornadas.api';
 import type { Jornada } from './jornadas.types';
 import { formatDate, todayIso } from '../../lib/format';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
 
 function inicioDeMes() {
   const now = new Date();
@@ -85,7 +85,7 @@ export function JornadasPage() {
       </div>
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : error ? (
         <ErrorState message={error} />
       ) : (

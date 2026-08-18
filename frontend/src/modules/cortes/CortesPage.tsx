@@ -5,7 +5,7 @@ import type { Corte } from './cortes.types';
 import type { CorteFormValues } from './cortes.schema';
 import { formatCurrency, formatDate } from '../../lib/format';
 import { useAuth } from '../auth/AuthContext';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
 
 export function CortesPage() {
@@ -65,7 +65,7 @@ export function CortesPage() {
       {showForm && <CorteForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />}
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : error ? (
         <ErrorState message={error} />
       ) : (

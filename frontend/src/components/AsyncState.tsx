@@ -8,6 +8,16 @@ export function Skeleton({ className = '', style }: { className?: string; style?
   return <div className={`skeleton ${className}`.trim()} style={style} />;
 }
 
+export function PageSkeleton() {
+  return (
+    <div>
+      <Skeleton style={{ height: 60, marginBottom: 9 }} />
+      <Skeleton style={{ height: 60, marginBottom: 9 }} />
+      <Skeleton style={{ height: 60 }} />
+    </div>
+  );
+}
+
 export function ErrorState({ message }: { message: string }) {
   return <p className="form-error">{message}</p>;
 }

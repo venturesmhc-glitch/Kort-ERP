@@ -30,11 +30,17 @@ export const router = createBrowserRouter([
     path: '/admin/login',
     element: <LoginPage />,
   },
+  // El wizard vive fuera de PublicLayout: cada paso tiene su propia cabecera
+  // (ver design_handoff_kort_ui) y no debe mostrar la navegacion del sitio
+  // publico ni el link de login del equipo.
+  {
+    path: '/turnos',
+    element: <TurnoWizardPage />,
+  },
   {
     element: <PublicLayout />,
     children: [
       { path: '/', element: <LandingHomePage /> },
-      { path: '/turnos', element: <TurnoWizardPage /> },
       { path: '/tienda', element: <StorePage /> },
       { path: '/contacto', element: <ContactPage /> },
     ],

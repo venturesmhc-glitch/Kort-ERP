@@ -185,7 +185,7 @@ export function TurnosPage() {
               onCancel={() => setEditingHorario(null)}
             />
           )}
-          <div className="table-wrap">
+          <div className="table-wrap table-wrap--cards">
             <table className="data-table">
               <thead>
                 <tr>
@@ -198,12 +198,12 @@ export function TurnosPage() {
               <tbody>
                 {horarios.map((horario) => (
                   <tr key={horario.id}>
-                    <td>{horario.barberoNombre}</td>
-                    <td>{DIA_LABELS[horario.dia]}</td>
-                    <td>
+                    <td data-label="Barbero">{horario.barberoNombre}</td>
+                    <td data-label="Dia">{DIA_LABELS[horario.dia]}</td>
+                    <td data-label="Horario" className="font-mono">
                       {horario.horaInicio} - {horario.horaFin}
                     </td>
-                    <td className="data-table-actions">
+                    <td className="data-table-actions" data-label="">
                       {canManageSchedules && (
                         <>
                           <button type="button" onClick={() => setEditingHorario(horario)}>
@@ -219,7 +219,7 @@ export function TurnosPage() {
                 ))}
                 {horarios.length === 0 && (
                   <tr>
-                    <td colSpan={4}>
+                    <td colSpan={4} data-label="">
                       <EmptyState message="No hay horarios cargados todavia." />
                     </td>
                   </tr>

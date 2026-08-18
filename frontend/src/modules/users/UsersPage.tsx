@@ -8,7 +8,8 @@ import {
 import { UserForm } from './UserForm';
 import type { AppUser } from './users.types';
 import type { UserFormValues } from './users.schema';
-import { EmptyState, ErrorState, LoadingState, toErrorMessage } from '../../components/AsyncState';
+import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
+import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/toast/ToastProvider';
 
 export function UsersPage() {
@@ -92,11 +93,11 @@ export function UsersPage() {
       )}
 
       {loading ? (
-        <LoadingState />
+        <PageSkeleton />
       ) : error ? (
         <ErrorState message={error} />
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap table-wrap--cards">
           <table className="data-table">
             <thead>
               <tr>
@@ -111,18 +112,18 @@ export function UsersPage() {
             <tbody>
               {users.map((user) => (
                 <tr key={user.id}>
-                  <td>
+                  <td data-label="Nombre">
                     {user.firstName} {user.lastName}
                   </td>
-                  <td>{user.email}</td>
-                  <td>{user.role}</td>
-                  <td>{user.phone ?? '-'}</td>
-                  <td>
-                    <span className={user.active ? 'badge badge-success' : 'badge badge-muted'}>
+                  <td data-label="Email">{user.email}</td>
+                  <td data-label="Rol">{user.role}</td>
+                  <td data-label="Telefono">{user.phone ?? '-'}</td>
+                  <td data-label="Estado">
+                    <StatusBadge tone={user.active ? 'success' : 'muted'}>
                       {user.active ? 'Activo' : 'Inactivo'}
-                    </span>
+                    </StatusBadge>
                   </td>
-                  <td className="data-table-actions">
+                  <td className="data-table-actions" data-label="">
                     <button type="button" onClick={() => setEditingUser(user)}>
                       Editar
                     </button>
@@ -136,7 +137,7 @@ export function UsersPage() {
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={6} data-label="">
                     <EmptyState message="No hay usuarios cargados todavia." />
                   </td>
                 </tr>

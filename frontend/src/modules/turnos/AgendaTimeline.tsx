@@ -3,7 +3,7 @@ import { listBarberosRequest } from '../users/users.api';
 import type { AppUser } from '../users/users.types';
 import { DIAS_SEMANA, TURNO_ESTADO_LABELS, type Horario, type Turno, type TurnoEstado } from './turnos.types';
 import { nowMinutes, timeToMinutes } from './agenda.utils';
-import { formatDate, todayIso } from '../../lib/format';
+import { formatDate, shiftIso, todayIso } from '../../lib/format';
 import { EmptyState } from '../../components/AsyncState';
 
 const HOUR_HEIGHT = 60;
@@ -22,16 +22,6 @@ function diaSemanaFromIso(fecha: string) {
   const jsDay = new Date(y, m - 1, d).getDay(); // 0 = domingo
   const index = (jsDay + 6) % 7; // 0 = lunes
   return DIAS_SEMANA[index];
-}
-
-function shiftIso(fecha: string, days: number) {
-  const [y, m, d] = fecha.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  date.setDate(date.getDate() + days);
-  const yy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  return `${yy}-${mm}-${dd}`;
 }
 
 function computeFreeGaps(rangeStart: number, rangeEnd: number, occupied: [number, number][], minGap: number) {

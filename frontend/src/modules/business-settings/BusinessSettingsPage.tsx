@@ -5,7 +5,8 @@ import { updateBusinessSettingsRequest } from './business-settings.api';
 import { useToast } from '../../components/toast/ToastProvider';
 import { ApiError } from '../../lib/apiClient';
 import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
-import { LoadingState } from '../../components/AsyncState';
+import { PageSkeleton } from '../../components/AsyncState';
+import { Toggle } from '../../components/Toggle';
 
 export function BusinessSettingsPage() {
   const { settings, loading, refresh } = useBusinessSettings();
@@ -43,7 +44,7 @@ export function BusinessSettingsPage() {
   }
 
   if (loading && !seeded) {
-    return <LoadingState />;
+    return <PageSkeleton />;
   }
 
   return (
@@ -169,14 +170,14 @@ export function BusinessSettingsPage() {
 
         <h2>Badge junto al logo</h2>
 
-        <label className="checkbox-field">
-          <input
-            type="checkbox"
+        <div className="checkbox-field">
+          <Toggle
             checked={values.badge.enabled}
-            onChange={(e) => setValues((prev) => ({ ...prev, badge: { ...prev.badge, enabled: e.target.checked } }))}
+            onChange={(enabled) => setValues((prev) => ({ ...prev, badge: { ...prev.badge, enabled } }))}
+            label="Mostrar badge"
           />
-          Mostrar badge
-        </label>
+          <span>Mostrar badge</span>
+        </div>
 
         {values.badge.enabled && (
           <>
@@ -244,16 +245,14 @@ export function BusinessSettingsPage() {
 
         <h2>Pie de pagina</h2>
 
-        <label className="checkbox-field">
-          <input
-            type="checkbox"
+        <div className="checkbox-field">
+          <Toggle
             checked={values.poweredBy.enabled}
-            onChange={(e) =>
-              setValues((prev) => ({ ...prev, poweredBy: { ...prev.poweredBy, enabled: e.target.checked } }))
-            }
+            onChange={(enabled) => setValues((prev) => ({ ...prev, poweredBy: { ...prev.poweredBy, enabled } }))}
+            label='Mostrar leyenda "powered by"'
           />
-          Mostrar leyenda "powered by"
-        </label>
+          <span>Mostrar leyenda "powered by"</span>
+        </div>
 
         {values.poweredBy.enabled && (
           <>
