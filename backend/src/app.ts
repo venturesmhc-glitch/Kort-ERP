@@ -27,6 +27,7 @@ import {
   businessSettingsRouter,
   publicBusinessSettingsRouter,
 } from './modules/business-settings/business-settings.routes.js';
+import { notificationsRouter } from './modules/notifications/notifications.routes.js';
 
 export const app = express();
 
@@ -76,5 +77,6 @@ app.use('/api/purchase-orders', purchaseOrdersRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/business-settings', businessSettingsRouter);
 app.use('/api/public/business-settings', publicBusinessSettingsRouter);
+app.use('/api/notifications', notificationsRouter);
 
 app.use(errorHandler);

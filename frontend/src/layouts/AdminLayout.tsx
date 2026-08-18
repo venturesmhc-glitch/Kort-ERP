@@ -3,8 +3,9 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../modules/auth/AuthContext';
 import { useTheme } from '../theme/ThemeProvider';
 import type { Role } from '../modules/auth/auth.types';
-import { listStockBajoRequest } from '../modules/articulos/articulos.api';
 import { useBusinessSettings } from '../modules/business-settings/BusinessSettingsContext';
+import { useNotifications } from '../modules/notifications/useNotifications';
+import { NotificationBell } from '../components/NotificationBell';
 import {
   IconHome,
   IconCalendar,
@@ -106,21 +107,17 @@ export function AdminLayout() {
   const { theme, toggleTheme } = useTheme();
   const { settings } = useBusinessSettings();
   const location = useLocation();
-  const canSeeStock = user?.role === 'DEV' || user?.role === 'ENCARGADO';
-  const [stockBajoCount, setStockBajoCount] = useState(0);
+  const { notifications, unreadCount, markAllRead } = useNotifications(user?.id);
+  // Deriva el contador del mismo feed de notificaciones en vez de pedir
+  // listStockBajoRequest aparte: antes solo se pedia una vez al montar el
+  // layout, ahora se actualiza con el mismo polling que la campanita.
+  const stockBajoCount = notifications.filter((n) => n.tipo === 'stock_bajo').length;
   const [accountOpen, setAccountOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
   const [logoBroken, setLogoBroken] = useState(false);
 
   useEffect(() => setLogoBroken(false), [settings.logoUrl]);
-
-  useEffect(() => {
-    if (!canSeeStock) return;
-    listStockBajoRequest()
-      .then((articulos) => setStockBajoCount(articulos.length))
-      .catch(() => undefined);
-  }, [canSeeStock]);
 
   useEffect(() => {
     setMoreOpen(false);
@@ -222,6 +219,7 @@ export function AdminLayout() {
                 <p className="admin-header-subtitle">{DATE_LABEL}</p>
               </div>
               <div className="admin-header-actions">
+                <NotificationBell notifications={notifications} unreadCount={unreadCount} onOpen={markAllRead} />
                 <NavLink to="/" className="button-secondary">
                   Ver sitio publico
                 </NavLink>
@@ -252,6 +250,9 @@ export function AdminLayout() {
                 {tab.label}
               </NavLink>
             ))}
+          </div>
+          <div className="mobile-notification-slot">
+            <NotificationBell notifications={notifications} unreadCount={unreadCount} onOpen={markAllRead} />
           </div>
           <button
             type="button"
