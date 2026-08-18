@@ -85,7 +85,9 @@ export function AgendaTimeline({ turnos, horarios, slotMinutos, onEstadoChange }
 
   function eventaStyleFor(turno: Turno) {
     const top = ((timeToMinutes(turno.hora) - rangeStartMin) / 60) * HOUR_HEIGHT + 1;
-    const height = Math.max(36, (slotMinutos / 60) * HOUR_HEIGHT - 2);
+    // El alto nunca puede superar el espacio real entre turnos consecutivos
+    // (slotMinutos en pixeles) o dos turnos seguidos se pisan visualmente.
+    const height = Math.max(18, (slotMinutos / 60) * HOUR_HEIGHT - 2);
     return { top, height };
   }
 
@@ -100,8 +102,10 @@ export function AgendaTimeline({ turnos, horarios, slotMinutos, onEstadoChange }
   function renderColumn(barbero: AppUser) {
     const eventos = dateTurnos.filter((t) => t.barberoId === barbero.id);
     const horario = horarios.find((h) => h.barberoId === barbero.id && h.dia === diaSemana);
+    // Incluye los cancelados: siguen dibujandose en su horario, asi que ese
+    // espacio no puede marcarse "Libre" tambien o el hueco queda superpuesto
+    // con la tarjeta del turno cancelado.
     const occupied: [number, number][] = eventos
-      .filter((t) => t.estado !== 'cancelado')
       .map((t): [number, number] => [timeToMinutes(t.hora), timeToMinutes(t.hora) + slotMinutos])
       .sort((a, b) => a[0] - b[0]);
     const gaps = horario

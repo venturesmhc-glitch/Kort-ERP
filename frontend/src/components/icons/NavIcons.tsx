@@ -188,6 +188,26 @@ export function IconCatalog(props: IconProps) {
   );
 }
 
+export function IconBell(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5 7.5c0-2.2 1.8-4 4-4s4 1.8 4 4v3.2l1.5 2.8h-11l1.5-2.8z" />
+      <path d="M7.5 14.5c0 .9.7 1.6 1.5 1.6s1.5-.7 1.5-1.6" />
+    </svg>
+  );
+}
+
+export function IconScissors(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="4.5" cy="5" r="1.8" />
+      <circle cx="4.5" cy="13" r="1.8" />
+      <line x1="6" y1="6.2" x2="15.5" y2="15.5" />
+      <line x1="6" y1="11.8" x2="15.5" y2="2.5" />
+    </svg>
+  );
+}
+
 export function IconMore(props: IconProps) {
   return (
     <svg {...base} {...props}>

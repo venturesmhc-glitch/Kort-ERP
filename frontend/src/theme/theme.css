@@ -22,6 +22,8 @@
   --color-danger-bg: #f3e7e2;
   --color-danger-border: #e6cec5;
   --color-success: #3d6b5e;
+  --color-success-bg: #eaf0e7;
+  --color-success-border: #d9e3d4;
 
   --chart-color-1: #22423a;
   --chart-color-2: #c08a3e;
@@ -31,38 +33,46 @@
   --shadow-float: 0 10px 34px rgba(34, 66, 58, 0.16);
   --font-sans: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  color-scheme: light;
 }
 
+/* Verde oscuro (no un sage claro) para que los fondos grandes -sidebar,
+   botones, tarjetas destacadas- sigan leyendo como "verde profundo" en vez
+   de brillar como lima contra un fondo casi negro. El texto sobre esos
+   fondos se mantiene claro en los dos temas. */
 [data-theme='dark'] {
   --color-bg: #101214;
   --color-surface: #171a1d;
   --color-surface-alt: #1c2124;
   --color-border: #24282c;
-  --color-border-strong: #2c3136;
+  --color-border-strong: #333940;
   --color-text: #e9edf0;
-  --color-text-muted: #8b959c;
-  --color-text-faint: #6f787f;
-  --color-primary: #8aa79a;
-  --color-primary-contrast: #0c1012;
-  --color-primary-soft: #4d6459;
-  --color-secondary: #8aa79a;
-  --color-accent: #c08a3e;
+  --color-text-muted: #99a3aa;
+  --color-text-faint: #767f86;
+  --color-primary: #2f5346;
+  --color-primary-contrast: #eef3ee;
+  --color-primary-soft: #7f9c8f;
+  --color-secondary: #3a5c4f;
+  --color-accent: #c99a52;
   --color-accent-contrast: #17110a;
-  --color-accent-ink: #d6a860;
+  --color-accent-ink: #dcb279;
   --color-accent-bg: #2a2318;
   --color-accent-border: #3a2f1d;
   --color-danger: #c17257;
   --color-danger-ink: #d68b6f;
   --color-danger-bg: #2a1e19;
   --color-danger-border: #3d2a22;
-  --color-success: #7fa89a;
+  --color-success: #8fb3a4;
+  --color-success-bg: #1c2b25;
+  --color-success-border: #2c3f36;
 
-  --chart-color-1: #8aa79a;
-  --chart-color-2: #c08a3e;
+  --chart-color-1: #7f9c8f;
+  --chart-color-2: #c99a52;
   --chart-color-3: #4d6459;
-  --chart-color-4: #2c3136;
+  --chart-color-4: #333940;
 
   --shadow-float: 0 10px 34px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
 }
 
 * {
@@ -73,6 +83,33 @@ html,
 body,
 #root {
   height: 100%;
+}
+
+html {
+  /* Sin esto, tocar una tarjeta (barbero, horario, dia) en mobile Chrome
+     deja un recuadro gris translucido superpuesto (el "sombreado" al
+     seleccionar). */
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+[role='switch'] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+[role='switch']:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible) {
+  outline: none;
 }
 
 body {
@@ -89,6 +126,22 @@ code,
 kbd,
 .font-mono {
   font-family: var(--font-mono);
+}
+
+/* Evita que el autocompletado del navegador imponga su propio fondo claro
+   (ignora nuestro background-color) y quede ilegible sobre el tema oscuro. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text);
+  box-shadow: 0 0 0 1000px var(--color-surface) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+.login-field input:-webkit-autofill,
+.login-field input:-webkit-autofill:hover,
+.login-field input:-webkit-autofill:focus {
+  box-shadow: 0 0 0 1000px transparent inset;
 }
 
 @media (prefers-reduced-motion: reduce) {
