@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createClient } from '@supabase/supabase-js';
+import { StorageClient } from '@supabase/storage-js';
 import { env } from '../../config/env.js';
 
 export interface UploadableFile {
@@ -80,13 +80,18 @@ class LocalDiskStorageService implements StorageService {
 }
 
 class SupabaseStorageService implements StorageService {
-  private client = createClient(env.supabaseUrl!, env.supabaseServiceRoleKey!);
+  // StorageClient standalone (sin Auth/Realtime, que en supabase-js completo
+  // requieren Node 22+ para WebSocket nativo; Render corre Node 20).
+  private client = new StorageClient(`${env.supabaseUrl}/storage/v1`, {
+    apikey: env.supabaseServiceRoleKey!,
+    Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+  });
   private bucket = env.supabaseStorageBucket;
   private urlMarker = `/storage/v1/object/public/${env.supabaseStorageBucket}/`;
 
   async uploadImage(file: UploadableFile) {
     const key = `${randomUUID()}${extensionFor(file.mimeType)}`;
-    const { error } = await this.client.storage.from(this.bucket).upload(key, file.buffer, {
+    const { error } = await this.client.from(this.bucket).upload(key, file.buffer, {
       contentType: file.mimeType,
       upsert: false,
     });
@@ -98,11 +103,11 @@ class SupabaseStorageService implements StorageService {
   }
 
   getImageUrl(key: string): string {
-    return this.client.storage.from(this.bucket).getPublicUrl(key).data.publicUrl;
+    return this.client.from(this.bucket).getPublicUrl(key).data.publicUrl;
   }
 
   async deleteImage(key: string): Promise<void> {
-    await this.client.storage.from(this.bucket).remove([key]);
+    await this.client.from(this.bucket).remove([key]);
   }
 
   keyFromUrl(url: string): string | null {

@@ -20,7 +20,7 @@
   "dependencies": {
     "@kort/shared": "*",
     "@prisma/client": "^5.18.0",
-    "@supabase/supabase-js": "^2.112.3",
+    "@supabase/storage-js": "^2.112.3",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
