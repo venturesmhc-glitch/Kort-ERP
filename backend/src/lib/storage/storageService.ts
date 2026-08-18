@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { createClient } from '@supabase/supabase-js';
 import { env } from '../../config/env.js';
 
 export interface UploadableFile {
@@ -10,16 +11,19 @@ export interface UploadableFile {
   originalName: string;
 }
 
-// Abstraccion del proveedor de almacenamiento de imagenes (todavia sin definir
-// en skills.md). Cambiar a S3/Cloudinary despues es escribir otra implementacion
-// de esta interfaz, sin tocar el resto del codigo (ver LocalDiskStorageService).
+// Abstraccion del proveedor de almacenamiento de imagenes: LocalDiskStorageService
+// para desarrollo, SupabaseStorageService para produccion (Render tiene filesystem
+// efimero, un disco local ahi pierde los archivos en cada deploy/restart).
 export interface StorageService {
   uploadImage(file: UploadableFile): Promise<{ key: string; url: string }>;
   getImageUrl(key: string): string;
   deleteImage(key: string): Promise<void>;
+  // Recupera la key (nombre de archivo) a partir de una URL previamente
+  // devuelta por uploadImage, para poder borrar la imagen anterior al
+  // reemplazarla. Cada implementacion arma URLs distintas, asi que el
+  // parseo es especifico de cada una.
+  keyFromUrl(url: string): string | null;
 }
-
-const UPLOAD_DIR = path.resolve(process.cwd(), 'uploads', 'articles');
 
 const EXTENSION_BY_MIME: Record<string, string> = {
   'image/jpeg': '.jpg',
@@ -30,19 +34,21 @@ const EXTENSION_BY_MIME: Record<string, string> = {
 
 // Whitelist de mimetypes de imagen aceptados para upload. Deliberadamente sin
 // image/svg+xml: un SVG es XML y puede llevar <script> embebido, asi que
-// servirlo tal cual desde /uploads (estatico) es un vector de XSS almacenado.
+// servirlo tal cual desde storage (estatico) es un vector de XSS almacenado.
 export const ALLOWED_IMAGE_MIME_TYPES = Object.keys(EXTENSION_BY_MIME);
 
 // La extension sale siempre del mimetype, nunca del nombre original del
 // archivo (controlado por el cliente): si se tomara de ahi, un archivo con
 // mimetype image/* pero nombre "x.svg"/"x.html" quedaria guardado y servido
-// con esa extension via /uploads, habilitando XSS almacenado. Un mimetype
-// fuera del whitelist no deberia llegar aca (ver fileFilter en
-// articles.routes.ts), pero si pasa devolvemos '' antes que confiar en el
-// nombre del cliente.
+// con esa extension, habilitando XSS almacenado. Un mimetype fuera del
+// whitelist no deberia llegar aca (ver fileFilter en articles.routes.ts),
+// pero si pasa devolvemos '' antes que confiar en el nombre del cliente.
 function extensionFor(mimeType: string): string {
   return EXTENSION_BY_MIME[mimeType] ?? '';
 }
+
+const UPLOAD_DIR = path.resolve(process.cwd(), 'uploads', 'articles');
+const LOCAL_URL_MARKER = '/uploads/articles/';
 
 class LocalDiskStorageService implements StorageService {
   async uploadImage(file: UploadableFile) {
@@ -57,7 +63,7 @@ class LocalDiskStorageService implements StorageService {
   }
 
   getImageUrl(key: string): string {
-    return `${env.publicUrl}/uploads/articles/${key}`;
+    return `${env.publicUrl}${LOCAL_URL_MARKER}${key}`;
   }
 
   async deleteImage(key: string): Promise<void> {
@@ -66,12 +72,52 @@ class LocalDiskStorageService implements StorageService {
       await unlink(filePath);
     }
   }
+
+  keyFromUrl(url: string): string | null {
+    const index = url.indexOf(LOCAL_URL_MARKER);
+    return index === -1 ? null : url.slice(index + LOCAL_URL_MARKER.length);
+  }
 }
 
-export const storageService: StorageService = new LocalDiskStorageService();
+class SupabaseStorageService implements StorageService {
+  private client = createClient(env.supabaseUrl!, env.supabaseServiceRoleKey!);
+  private bucket = env.supabaseStorageBucket;
+  private urlMarker = `/storage/v1/object/public/${env.supabaseStorageBucket}/`;
+
+  async uploadImage(file: UploadableFile) {
+    const key = `${randomUUID()}${extensionFor(file.mimeType)}`;
+    const { error } = await this.client.storage.from(this.bucket).upload(key, file.buffer, {
+      contentType: file.mimeType,
+      upsert: false,
+    });
+    if (error) {
+      throw new Error(`No se pudo subir la imagen a Supabase Storage: ${error.message}`);
+    }
+
+    return { key, url: this.getImageUrl(key) };
+  }
+
+  getImageUrl(key: string): string {
+    return this.client.storage.from(this.bucket).getPublicUrl(key).data.publicUrl;
+  }
+
+  async deleteImage(key: string): Promise<void> {
+    await this.client.storage.from(this.bucket).remove([key]);
+  }
+
+  keyFromUrl(url: string): string | null {
+    const index = url.indexOf(this.urlMarker);
+    return index === -1 ? null : url.slice(index + this.urlMarker.length);
+  }
+}
+
+// Si estan configuradas las credenciales de Supabase, se usa ese backend
+// (requerido en Render por el filesystem efimero); si no, disco local (dev).
+export const storageService: StorageService =
+  env.supabaseUrl && env.supabaseServiceRoleKey
+    ? new SupabaseStorageService()
+    : new LocalDiskStorageService();
 
 export function imageKeyFromUrl(url: string): string | null {
-  const marker = '/uploads/articles/';
-  const index = url.indexOf(marker);
-  return index === -1 ? null : url.slice(index + marker.length);
+  return storageService.keyFromUrl(url);
 }

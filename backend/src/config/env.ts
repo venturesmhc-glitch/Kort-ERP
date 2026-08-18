@@ -15,8 +15,17 @@ export const env = {
   databaseUrl: requireEnv('DATABASE_URL'),
   jwtSecret: requireEnv('JWT_SECRET'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '8h',
-  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  // Lista separada por comas (ej. dominio de prod + previews de Vercel).
+  corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   // Base publica del backend, usada para armar URLs de archivos servidos
-  // estaticamente (ej. imagenes de articulos). Ver StorageService.
+  // estaticamente (ej. imagenes de articulos) cuando se usa LocalDiskStorageService.
   publicUrl: process.env.PUBLIC_URL ?? `http://localhost:${port}`,
+  // Opcionales: si estan las tres, StorageService usa Supabase Storage en vez
+  // de disco local (necesario en Render, que tiene filesystem efimero).
+  supabaseUrl: process.env.SUPABASE_URL,
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? 'article-images',
 };

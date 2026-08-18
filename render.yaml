@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: kort-backend
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: >-
+      npm install &&
+      npm run build -w @kort/shared &&
+      npx prisma generate --schema=backend/prisma/schema.prisma &&
+      npx prisma migrate deploy --schema=backend/prisma/schema.prisma &&
+      npm run build -w backend
+    startCommand: node backend/dist/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: CORS_ORIGIN
+        sync: false
+      - key: PUBLIC_URL
+        sync: false
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: article-images

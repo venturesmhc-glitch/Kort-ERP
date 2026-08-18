@@ -34,7 +34,18 @@ export const app = express();
 // las imagenes de /uploads en <img>, el default 'same-origin' de helmet las
 // bloquearia.
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({ origin: env.corsOrigin }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Sin header Origin (curl, health checks) o origen en la whitelist: permitir.
+      if (!origin || env.corsOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('No permitido por CORS'));
+      }
+    },
+  }),
+);
 app.use(express.json());
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
