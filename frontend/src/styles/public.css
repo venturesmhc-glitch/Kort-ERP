@@ -616,6 +616,12 @@
   font-weight: 700;
 }
 
+.wizard-service-price {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
 .wizard-summary-card {
   padding: 18px;
   border-radius: 20px;
@@ -635,6 +641,11 @@
 
 .wizard-summary-row:last-child {
   border-bottom: none;
+}
+
+.wizard-summary-total {
+  font-weight: 700;
+  font-size: 15px;
 }
 
 .wizard-summary-label {

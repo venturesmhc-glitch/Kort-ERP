@@ -10,6 +10,7 @@ interface CatalogItemFormProps {
   onSubmit: (values: CatalogItemFormValues) => Promise<void>;
   onCancel: () => void;
   showPrecio?: boolean;
+  hideDescripcion?: boolean;
 }
 
 const EMPTY_VALUES: CatalogItemFormValues = { nombre: '', descripcion: '', activo: true };
@@ -19,6 +20,7 @@ export function CatalogItemForm({
   onSubmit,
   onCancel,
   showPrecio = false,
+  hideDescripcion = false,
 }: CatalogItemFormProps) {
   const toast = useToast();
   const [values, setValues] = useState<CatalogItemFormValues>(initialValues);
@@ -58,14 +60,18 @@ export function CatalogItemForm({
       />
       {getFieldError(issues, 'nombre') && <p className="form-error">{getFieldError(issues, 'nombre')}</p>}
 
-      <label htmlFor="descripcion">Descripcion (opcional)</label>
-      <input
-        id="descripcion"
-        value={values.descripcion}
-        onChange={(e) => setValues((prev) => ({ ...prev, descripcion: e.target.value }))}
-      />
-      {getFieldError(issues, 'descripcion') && (
-        <p className="form-error">{getFieldError(issues, 'descripcion')}</p>
+      {!hideDescripcion && (
+        <>
+          <label htmlFor="descripcion">Descripcion (opcional)</label>
+          <input
+            id="descripcion"
+            value={values.descripcion}
+            onChange={(e) => setValues((prev) => ({ ...prev, descripcion: e.target.value }))}
+          />
+          {getFieldError(issues, 'descripcion') && (
+            <p className="form-error">{getFieldError(issues, 'descripcion')}</p>
+          )}
+        </>
       )}
 
       {showPrecio && (

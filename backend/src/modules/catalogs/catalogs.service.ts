@@ -78,7 +78,10 @@ export async function listPublicItems(key: string) {
     throw new NotFoundError('Catalogo no encontrado');
   }
   const items = await listItems(key, false);
-  return items.map((item) => ({ id: item.id, name: item.name }));
+  // precio solo tiene sentido para "tipos-corte" (ver comentario en schema.prisma
+  // sobre el campo `price`), pero mapearlo siempre es inofensivo: el resto de
+  // las categorias publicas (tipos-producto) simplemente no lo carga.
+  return items.map((item) => ({ id: item.id, name: item.name, price: item.price ?? null }));
 }
 
 export async function createItem(key: string, input: CreateItemInput) {

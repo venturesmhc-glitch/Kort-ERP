@@ -52,7 +52,10 @@ export function ParametrizadosPage() {
 
   async function loadCategories(selectKey?: CatalogKey) {
     try {
-      const list = await listCategoriesRequest();
+      // "Tipos de corte" tiene su propia pestaña dedicada dentro de Cortes
+      // (ver CortesPage) para no mezclar la definicion de precios de corte
+      // con los catalogos genericos de este modulo.
+      const list = (await listCategoriesRequest()).filter((c) => c.key !== 'tipos-corte');
       setCategories(list);
       const nextKey = selectKey ?? list[0]?.key ?? null;
       setActiveKey(nextKey);

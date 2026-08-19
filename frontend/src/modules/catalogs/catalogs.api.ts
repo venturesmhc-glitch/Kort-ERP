@@ -88,8 +88,9 @@ export async function listActiveCatalogItemsRequest(key: CatalogKey): Promise<Ca
 // Sin autenticacion: usado por la landing publica (wizard de turnos, tienda),
 // solo expone las keys de la whitelist del backend (ver PUBLIC_CATALOG_KEYS).
 export async function listPublicCatalogItemsRequest(key: CatalogKey): Promise<CatalogItem[]> {
-  const dtos = await apiRequest<{ id: string; name: string }[]>(`/public/catalogs/${key}/items`, {
-    auth: false,
-  });
-  return dtos.map((dto) => ({ id: dto.id, nombre: dto.name, activo: true }));
+  const dtos = await apiRequest<{ id: string; name: string; price: number | null }[]>(
+    `/public/catalogs/${key}/items`,
+    { auth: false }
+  );
+  return dtos.map((dto) => ({ id: dto.id, nombre: dto.name, activo: true, precio: dto.price ?? undefined }));
 }

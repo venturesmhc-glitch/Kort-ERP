@@ -8,7 +8,7 @@ import { listPublicCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
 import { crearTurnoRequest, listSlotsDisponiblesRequest } from '../turnos/turnos.api';
 import type { Turno } from '../turnos/turnos.types';
-import { clearPendingMerchSaleId, loadPendingMerchSaleId } from '../public-store/store.types';
+import { clearPendingMerchSaleId, loadPendingMerchSale, type PendingMerchSale } from '../public-store/store.types';
 import { formatDate, formatCurrency, shiftIso, todayIso } from '../../lib/format';
 import { ErrorState, Skeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
@@ -81,6 +81,7 @@ export function TurnoWizardPage() {
   const [checkingDiscount, setCheckingDiscount] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [initialError, setInitialError] = useState<string | null>(null);
+  const [pendingMerch, setPendingMerch] = useState<PendingMerchSale | null>(null);
 
   useEffect(() => {
     setInitialLoading(true);
@@ -152,6 +153,12 @@ export function TurnoWizardPage() {
       .catch(() => setSlots([]));
   }, [barberoId, fecha, anyBarbero, barberos]);
 
+  useEffect(() => {
+    if (step === 5) {
+      setPendingMerch(loadPendingMerchSale());
+    }
+  }, [step]);
+
   function goToStep(next: number) {
     setError(null);
     setStep(next);
@@ -207,7 +214,7 @@ export function TurnoWizardPage() {
     setError(null);
     setConfirming(true);
     try {
-      const merchSaleId = loadPendingMerchSaleId() ?? undefined;
+      const merchSaleId = loadPendingMerchSale()?.saleId ?? undefined;
       const codigoIngresado = discountCode.trim() || undefined;
       const turno = await crearTurnoRequest({
         clienteNombre: cliente.nombre,
@@ -225,6 +232,7 @@ export function TurnoWizardPage() {
       });
       clearTurnoDraft();
       clearPendingMerchSaleId();
+      setPendingMerch(null);
       // El resultado real de la aplicacion (no el preview) viaja en
       // discountApplied: un cupon puede haber quedado sin usos entre que se
       // valido y se confirmo el turno.
@@ -323,6 +331,7 @@ export function TurnoWizardPage() {
     );
   }
 
+  const corteSeleccionado = tiposCorte.find((t) => t.id === tipoCorteId);
   const manana = slots.filter((s) => s < '14:00');
   const tarde = slots.filter((s) => s >= '14:00');
   const continuarConLabel = anyBarbero ? 'Continuar' : barberoNombre ? `Continuar con ${barberoNombre}` : 'Continuar';
@@ -517,6 +526,9 @@ export function TurnoWizardPage() {
                   }}
                 >
                   <span className="wizard-service-name">{tipo.nombre}</span>
+                  {tipo.precio !== undefined && (
+                    <span className="wizard-service-price">{formatCurrency(tipo.precio)}</span>
+                  )}
                 </button>
               ))}
               {tiposCorte.length === 0 && <p className="text-muted">No hay tipos de corte cargados.</p>}
@@ -540,8 +552,26 @@ export function TurnoWizardPage() {
               </div>
               <div className="wizard-summary-row">
                 <span className="wizard-summary-label">Servicio</span>
-                <span>{tipoCorteNombre}</span>
+                <span>
+                  {tipoCorteNombre}
+                  {corteSeleccionado?.precio !== undefined && ` · ${formatCurrency(corteSeleccionado.precio)}`}
+                </span>
               </div>
+              {pendingMerch && (
+                <div className="wizard-summary-row">
+                  <span className="wizard-summary-label">Merchandising</span>
+                  <span>
+                    {pendingMerch.itemCount} producto{pendingMerch.itemCount === 1 ? '' : 's'} ·{' '}
+                    {formatCurrency(pendingMerch.total)}
+                  </span>
+                </div>
+              )}
+              {(corteSeleccionado?.precio !== undefined || pendingMerch) && (
+                <div className="wizard-summary-row wizard-summary-total">
+                  <span className="wizard-summary-label">Total</span>
+                  <span>{formatCurrency((corteSeleccionado?.precio ?? 0) + (pendingMerch?.total ?? 0))}</span>
+                </div>
+              )}
             </div>
             <p className="text-muted">
               Se abona en el local. {cliente.nombre} {cliente.apellido} · {cliente.telefono}

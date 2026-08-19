@@ -329,10 +329,10 @@ export function BusinessSettingsPage() {
           </label>
         </div>
 
-        <h2>Pie de pagina</h2>
-
-        {isDev ? (
+        {isDev && (
           <>
+            <h2>Pie de pagina</h2>
+
             <div className="checkbox-field">
               <Toggle
                 checked={values.poweredBy.enabled}
@@ -355,12 +355,6 @@ export function BusinessSettingsPage() {
               </>
             )}
           </>
-        ) : (
-          <p className="text-muted">
-            Leyenda &quot;powered by&quot;:{' '}
-            {values.poweredBy.enabled ? `activada ("${values.poweredBy.text}")` : 'desactivada'}. Esta
-            configuracion es exclusiva del rol Dev.
-          </p>
         )}
 
         <div className="client-form-actions">

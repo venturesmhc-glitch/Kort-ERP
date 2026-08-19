@@ -5,7 +5,7 @@ import type { Articulo } from '../articulos/articulos.types';
 import { listPublicCatalogItemsRequest } from '../catalogs/catalogs.api';
 import type { CatalogItem } from '../catalogs/catalogs.types';
 import { checkoutMerchRequest, type MerchClienteInput } from './merch.api';
-import { savePendingMerchSaleId, type CartItem } from './store.types';
+import { savePendingMerchSale, type CartItem } from './store.types';
 import { formatCurrency } from '../../lib/format';
 import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
@@ -22,6 +22,11 @@ export function StorePage() {
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [tipos, setTipos] = useState<CatalogItem[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  // Si venimos del wizard de turnos, los datos del cliente ya se cargaron ahi
+  // y quedan bloqueados aca: si se pudieran editar en la tienda, el turno y
+  // la venta de merch terminarian con datos de cliente distintos para la
+  // misma persona.
+  const [clienteBloqueado] = useState(() => vieneDeTurno && loadTurnoDraft() !== null);
   const [cliente, setCliente] = useState<MerchClienteInput>(() => {
     if (vieneDeTurno) {
       const draft = loadTurnoDraft();
@@ -117,9 +122,13 @@ export function StorePage() {
     setError(null);
     setConfirming(true);
     try {
-      const { saleId } = await checkoutMerchRequest(cart, cliente);
+      const { saleId, total: saleTotal } = await checkoutMerchRequest(cart, cliente);
       if (vieneDeTurno) {
-        savePendingMerchSaleId(saleId);
+        savePendingMerchSale({
+          saleId,
+          total: saleTotal,
+          itemCount: cart.reduce((sum, item) => sum + item.cantidad, 0),
+        });
       }
       setCart([]);
       setConfirmado(true);
@@ -204,22 +213,30 @@ export function StorePage() {
 
             {cart.length > 0 && (
               <div className="client-form">
+                {clienteBloqueado && (
+                  <p className="text-muted">
+                    Usamos los datos que ya cargaste para tu turno.
+                  </p>
+                )}
                 <label htmlFor="merchNombre">Nombre</label>
                 <input
                   id="merchNombre"
                   value={cliente.nombre}
+                  disabled={clienteBloqueado}
                   onChange={(e) => setCliente((prev) => ({ ...prev, nombre: e.target.value }))}
                 />
                 <label htmlFor="merchApellido">Apellido</label>
                 <input
                   id="merchApellido"
                   value={cliente.apellido}
+                  disabled={clienteBloqueado}
                   onChange={(e) => setCliente((prev) => ({ ...prev, apellido: e.target.value }))}
                 />
                 <label htmlFor="merchTelefono">Telefono</label>
                 <input
                   id="merchTelefono"
                   value={cliente.telefono}
+                  disabled={clienteBloqueado}
                   onChange={(e) => setCliente((prev) => ({ ...prev, telefono: e.target.value }))}
                 />
               </div>
