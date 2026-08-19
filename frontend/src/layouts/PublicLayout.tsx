@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useBusinessSettings } from '../modules/business-settings/BusinessSettingsContext';
 import { useBusinessTheme } from '../config/useBusinessTheme';
+import { IconHome, IconCalendar, IconStock, IconContact } from '../components/icons/NavIcons';
 
 export function PublicLayout() {
   useBusinessTheme();
@@ -48,11 +49,21 @@ export function PublicLayout() {
           </NavLink>
           <nav className="public-nav">
             <NavLink to="/" end>
+              <IconHome aria-hidden="true" />
               Inicio
             </NavLink>
-            <NavLink to="/turnos">Solicitar turno</NavLink>
-            <NavLink to="/tienda">Tienda</NavLink>
-            <NavLink to="/contacto">Contacto</NavLink>
+            <NavLink to="/turnos">
+              <IconCalendar aria-hidden="true" />
+              Solicitar turno
+            </NavLink>
+            <NavLink to="/tienda">
+              <IconStock aria-hidden="true" />
+              Tienda
+            </NavLink>
+            <NavLink to="/contacto">
+              <IconContact aria-hidden="true" />
+              Contacto
+            </NavLink>
           </nav>
           <div className="public-header-actions">
             <ThemeToggle />

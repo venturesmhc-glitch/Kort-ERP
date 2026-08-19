@@ -246,6 +246,14 @@ export function IconLogout(props: IconProps) {
   );
 }
 
+export function IconContact(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3.5 3.5h2.3l1.1 3-1.4 1.4a9 9 0 0 0 4.6 4.6l1.4-1.4 3 1.1v2.3c0 .8-.7 1.4-1.5 1.3-3-.4-5.8-1.8-7.9-3.9S3.4 7.5 3 4.5c-.1-.8.5-1.5 1.3-1.5z" />
+    </svg>
+  );
+}
+
 export function IconExternal(props: IconProps) {
   return (
     <svg {...base} {...props}>

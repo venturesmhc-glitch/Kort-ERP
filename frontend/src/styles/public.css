@@ -84,8 +84,17 @@
 }
 
 .public-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   color: inherit;
   text-decoration: none;
+}
+
+.public-nav a svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .public-nav a.active {
