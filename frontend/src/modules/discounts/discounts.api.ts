@@ -102,6 +102,7 @@ export interface ValidateDiscountResult {
 export function validateDiscountRequest(input: {
   code: string;
   items?: { articleId: string; quantity: number }[];
+  merchSaleId?: string;
   corte?: { tipoCorteId: string };
 }): Promise<ValidateDiscountResult> {
   return apiRequest<ValidateDiscountResult>('/public/discounts/validate', {

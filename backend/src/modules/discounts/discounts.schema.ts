@@ -41,17 +41,23 @@ const validateCorteSchema = z.object({
   tipoCorteId: z.string().uuid('Tipo de corte invalido'),
 });
 
-// items (carrito de Merch) y corte (turno) son independientes entre si: el
-// wizard publico puede mandar uno, otro o los dos juntos (ver
-// discounts.service.ts validateDiscount, que evalua cada parte por separado
-// segun el scope del cupon).
+// items (carrito de Merch), merchSaleId (pedido de merch ya confirmado, ver
+// wizard de turnos: "ver mercancia" antes de confirmar) y corte (turno) son
+// independientes entre si: el llamador puede mandar cualquier combinacion
+// (ver discounts.service.ts validateDiscount, que evalua cada parte por
+// separado segun el scope del cupon). items y merchSaleId son alternativas
+// para el mismo proposito (previsualizar el descuento en merch) - items para
+// un carrito que todavia no se confirmo (Ventas POS), merchSaleId para un
+// pedido ya persistido (wizard de turnos, evita resendear el carrito y
+// recalcula siempre desde los datos guardados).
 export const validateDiscountSchema = z
   .object({
     code: z.string().trim().min(1, 'El codigo es requerido'),
     items: z.array(validateItemSchema).optional(),
+    merchSaleId: z.string().uuid('Pedido invalido').optional(),
     corte: validateCorteSchema.optional(),
   })
-  .refine((data) => (data.items && data.items.length > 0) || data.corte, {
+  .refine((data) => (data.items && data.items.length > 0) || data.merchSaleId || data.corte, {
     message: 'Agrega al menos un articulo o un tipo de corte',
     path: ['items'],
   });

@@ -345,10 +345,28 @@ export async function validateDiscount(input: ValidateDiscountInput): Promise<Va
   let corte: PortionResult | undefined;
   let reason: string | undefined;
 
-  if (input.items && input.items.length > 0) {
+  // Mismos filtros que applyDiscountToMerchSale (channel MERCH, todavia
+  // pendiente de retiro, sin otro cupon ya aplicado): si el pedido no
+  // matchea, no hay nada para previsualizar, silenciosamente.
+  const merchSale = input.merchSaleId
+    ? await prisma.sale.findFirst({
+        where: { id: input.merchSaleId, channel: 'MERCH', status: 'PENDING_PICKUP', discountId: null },
+        include: { items: { include: { article: { select: { tipoProductoId: true } } } } },
+      })
+    : null;
+  const saleItems: PricedMerchItem[] | undefined = merchSale
+    ? merchSale.items.map((item) => ({
+        articleId: item.articleId,
+        tipoProductoId: item.article.tipoProductoId,
+        quantity: item.quantity,
+        subtotal: item.subtotal,
+      }))
+    : undefined;
+
+  if ((input.items && input.items.length > 0) || saleItems) {
     if (discount.scope === 'MERCH' || discount.scope === 'BOTH') {
-      const priced = await priceMerchItems(input.items);
-      const cartTotal = priced.reduce((sum, item) => sum + item.subtotal, 0);
+      const priced = saleItems ?? (await priceMerchItems(input.items!));
+      const cartTotal = merchSale ? merchSale.totalAmount : priced.reduce((sum, item) => sum + item.subtotal, 0);
       if (discount.minOrderAmount !== null && cartTotal < discount.minOrderAmount) {
         reason = reason ?? 'No se alcanzo el monto minimo de compra para este cupon';
       } else {

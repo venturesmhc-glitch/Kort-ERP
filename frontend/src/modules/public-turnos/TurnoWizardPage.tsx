@@ -198,6 +198,7 @@ export function TurnoWizardPage() {
       const result = await validateDiscountRequest({
         code: discountCode.trim(),
         corte: { tipoCorteId },
+        merchSaleId: pendingMerch?.saleId,
       });
       setDiscountPreview(result);
       if (!result.valid) {
@@ -332,6 +333,10 @@ export function TurnoWizardPage() {
   }
 
   const corteSeleccionado = tiposCorte.find((t) => t.id === tipoCorteId);
+  const descuentoCorte = discountPreview?.valid ? (discountPreview.corte?.discountAmount ?? 0) : 0;
+  const descuentoMerch = discountPreview?.valid ? (discountPreview.merch?.discountAmount ?? 0) : 0;
+  const totalFinal =
+    (corteSeleccionado?.precio ?? 0) + (pendingMerch?.total ?? 0) - descuentoCorte - descuentoMerch;
   const manana = slots.filter((s) => s < '14:00');
   const tarde = slots.filter((s) => s >= '14:00');
   const continuarConLabel = anyBarbero ? 'Continuar' : barberoNombre ? `Continuar con ${barberoNombre}` : 'Continuar';
@@ -566,10 +571,22 @@ export function TurnoWizardPage() {
                   </span>
                 </div>
               )}
+              {descuentoCorte > 0 && (
+                <div className="wizard-summary-row">
+                  <span className="wizard-summary-label">Descuento corte</span>
+                  <span>-{formatCurrency(descuentoCorte)}</span>
+                </div>
+              )}
+              {descuentoMerch > 0 && (
+                <div className="wizard-summary-row">
+                  <span className="wizard-summary-label">Descuento merch</span>
+                  <span>-{formatCurrency(descuentoMerch)}</span>
+                </div>
+              )}
               {(corteSeleccionado?.precio !== undefined || pendingMerch) && (
                 <div className="wizard-summary-row wizard-summary-total">
                   <span className="wizard-summary-label">Total</span>
-                  <span>{formatCurrency((corteSeleccionado?.precio ?? 0) + (pendingMerch?.total ?? 0))}</span>
+                  <span>{formatCurrency(totalFinal)}</span>
                 </div>
               )}
             </div>
@@ -602,8 +619,8 @@ export function TurnoWizardPage() {
             </label>
             {discountPreview && (
               <p className={discountPreview.valid ? 'text-muted' : 'form-error'}>
-                {discountPreview.valid && discountPreview.corte
-                  ? `Cupon valido: -${formatCurrency(discountPreview.corte.discountAmount)} en tu corte`
+                {discountPreview.valid
+                  ? 'Cupon aplicado, mira el detalle en el resumen de arriba.'
                   : (discountPreview.reason ?? 'Este cupon no aplica a tu turno')}
               </p>
             )}
