@@ -44,6 +44,15 @@ function matchesCorsOrigin(pattern: string, origin: string): boolean {
 
 export const app = express();
 
+// Render (y Vercel/cualquier PaaS) pone el backend detras de un unico reverse
+// proxy: sin esto, Express ve la IP interna del proxy en vez de la del
+// cliente real (req.ip), lo que rompe el rate limiting por IP de
+// rateLimit.ts (loginLimiter/publicWriteLimiter terminarian aplicando el
+// limite a todos los usuarios por igual en vez de por atacante). "1" = confiar
+// solo en el primer hop (el proxy de la plataforma), no en cualquier IP que
+// un cliente declare en X-Forwarded-For.
+app.set('trust proxy', 1);
+
 // crossOriginResourcePolicy en 'cross-origin': el frontend (otro origen) carga
 // las imagenes de /uploads en <img>, el default 'same-origin' de helmet las
 // bloquearia.

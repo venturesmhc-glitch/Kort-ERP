@@ -5,18 +5,31 @@ import { env } from '../../config/env.js';
 import { UnauthorizedError } from '../../utils/errors.js';
 import { WorkSessionService } from '../workshifts/workshifts.service.js';
 import type { LoginInput } from './auth.schema.js';
+import { clearFailedAttempts, isLockedOut, registerFailedAttempt } from './loginAttempts.js';
 
 export async function login({ email, password }: LoginInput) {
+  if (isLockedOut(email)) {
+    throw new UnauthorizedError(
+      'Cuenta bloqueada temporalmente por demasiados intentos fallidos. Intenta de nuevo en unos minutos.'
+    );
+  }
+
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user || !user.active) {
+    registerFailedAttempt(email);
+    console.warn(`[auth] login fallido (usuario inexistente o inactivo): email=${email}`);
     throw new UnauthorizedError('Credenciales invalidas');
   }
 
   const passwordMatches = await bcrypt.compare(password, user.password);
   if (!passwordMatches) {
+    registerFailedAttempt(email);
+    console.warn(`[auth] login fallido (contrasena incorrecta): userId=${user.id}`);
     throw new UnauthorizedError('Credenciales invalidas');
   }
+
+  clearFailedAttempts(email);
 
   const token = jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn,

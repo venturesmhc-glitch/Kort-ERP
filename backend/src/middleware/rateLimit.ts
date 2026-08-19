@@ -12,9 +12,12 @@ export const publicWriteLimiter = rateLimit({
   message: { message: 'Demasiadas solicitudes, intenta de nuevo mas tarde' },
 });
 
-// Limiter especifico para login: ventana de 15 min / 10 intentos por IP.
-// Mas estricto que publicWriteLimiter porque protege contra fuerza bruta de
-// contraseñas, no solo abuso de escritura publica.
+// Limiter por IP especifico para POST /api/auth/login (auditoria de
+// seguridad: el endpoint no tenia ningun limite, quedaba abierto a
+// bruteforce/credential stuffing). Ventana de 15 min / 10 intentos: mas
+// estricto que publicWriteLimiter porque login es el endpoint mas sensible
+// del sistema. skipSuccessfulRequests evita penalizar a un usuario legitimo
+// que ya inicio sesion correctamente dentro de la ventana.
 export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
