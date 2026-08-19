@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { listBarberosRequest } from '../users/users.api';
 import type { AppUser } from '../users/users.types';
 import { TURNO_ESTADO_LABELS, type Horario, type Turno, type TurnoEstado } from './turnos.types';
@@ -33,6 +33,18 @@ export function AgendaTimeline({ turnos, horarios, slotMinutos, onEstadoChange }
   const [profesionalFiltro, setProfesionalFiltro] = useState<string | 'todos'>('todos');
   const [fechaSeleccionada, setFechaSeleccionada] = useState(todayIso());
   const [turnoAbierto, setTurnoAbierto] = useState<Turno | null>(null);
+  const [actualizandoId, setActualizandoId] = useState<string | null>(null);
+
+  async function handleQuickEstadoChange(event: MouseEvent, turno: Turno, estado: TurnoEstado) {
+    event.stopPropagation();
+    if (actualizandoId) return;
+    setActualizandoId(turno.id);
+    try {
+      await onEstadoChange(turno.id, estado);
+    } finally {
+      setActualizandoId(null);
+    }
+  }
 
   useEffect(() => {
     listBarberosRequest()
@@ -135,13 +147,22 @@ export function AgendaTimeline({ turnos, horarios, slotMinutos, onEstadoChange }
               estado === 'current'
                 ? Math.min(100, Math.max(0, ((nowM - timeToMinutes(turno.hora)) / slotMinutos) * 100))
                 : 0;
+            const proximoEstado: TurnoEstado | null =
+              turno.estado === 'pendiente' ? 'confirmado' : turno.estado === 'confirmado' ? 'completado' : null;
             return (
-              <button
+              <div
                 key={turno.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 className={`agenda-event${estado !== 'normal' ? ` ${estado}` : ''}`}
                 style={{ top, height }}
                 onClick={() => setTurnoAbierto(turno)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setTurnoAbierto(turno);
+                  }
+                }}
               >
                 <div className="agenda-event-name">
                   {turno.clienteNombre} {turno.clienteApellido}
@@ -154,7 +175,19 @@ export function AgendaTimeline({ turnos, horarios, slotMinutos, onEstadoChange }
                     <div className="agenda-event-progress-fill" style={{ width: `${progresoPct}%` }} />
                   </div>
                 )}
-              </button>
+                {proximoEstado && (
+                  <button
+                    type="button"
+                    className="agenda-event-quick-action"
+                    title={proximoEstado === 'confirmado' ? 'Confirmar turno' : 'Marcar como completado'}
+                    aria-label={proximoEstado === 'confirmado' ? 'Confirmar turno' : 'Marcar como completado'}
+                    disabled={actualizandoId === turno.id}
+                    onClick={(event) => handleQuickEstadoChange(event, turno, proximoEstado)}
+                  >
+                    {actualizandoId === turno.id ? '…' : '✓'}
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>

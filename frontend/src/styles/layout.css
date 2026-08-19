@@ -1980,12 +1980,48 @@ button[type='button'] {
   left: 8px;
   right: 8px;
   border-radius: 14px;
-  padding: 9px 12px;
+  padding: 9px 34px 9px 12px;
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   overflow: hidden;
   cursor: pointer;
   text-align: left;
+}
+
+.agenda-event-quick-action {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-strong);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.agenda-event-quick-action:hover {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-contrast);
+}
+
+.agenda-event-quick-action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.agenda-event.current .agenda-event-quick-action {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: inherit;
 }
 
 .agenda-event-name {

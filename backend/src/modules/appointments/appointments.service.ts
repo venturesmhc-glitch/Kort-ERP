@@ -3,6 +3,7 @@ import type { AppointmentStatus, DayOfWeek, Discount } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
+import { createCutFromAppointment } from '../cuts/cuts.service.js';
 import { calculateDiscountAmount, resolveEligibleDiscount } from '../discounts/discounts.service.js';
 import { getBusinessSettings } from '../business-settings/business-settings.service.js';
 import { sendEmail } from '../../lib/notifications/emailProvider.js';
@@ -471,6 +472,15 @@ export async function updateAppointmentStatus(
 
   if (input.status === 'CANCELLED') {
     await NotificationService.cancelPendingReminders(updated.id);
+  }
+
+  // Completar un turno desde la Agenda tiene que generar el corte (y su
+  // ingreso en Tesoreria) igual que completarlo desde Cortes vinculando el
+  // turno del dia - antes solo cambiaba el status y el corte nunca se
+  // registraba. createCutFromAppointment es idempotente (no duplica si ya
+  // existe un corte vinculado a este turno).
+  if (input.status === 'COMPLETED') {
+    await createCutFromAppointment(updated.id);
   }
 
   return updated;

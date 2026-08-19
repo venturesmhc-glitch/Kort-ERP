@@ -117,6 +117,81 @@ export async function createCut(input: CreateCutInput, user: AuthUser) {
   }
 }
 
+// Contraparte de createCut para cuando el corte surge de completar un turno
+// desde la Agenda (ver appointments.service.ts updateAppointmentStatus) en vez
+// de cargarlo a mano desde Cortes. A diferencia de createCut, el cliente/
+// barbero/tipo de corte/cupon ya estan resueltos en el turno - no hace falta
+// buscar/crear cliente por telefono ni recibir un input separado.
+export async function createCutFromAppointment(appointmentId: string) {
+  const existing = await prisma.cut.findUnique({ where: { appointmentId } });
+  if (existing) {
+    // Ya tiene un corte vinculado (por ejemplo, se completo antes desde
+    // Cortes con "Vincular turno de hoy") - no duplicar.
+    return existing;
+  }
+
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    include: { discount: true, tipoCorte: true },
+  });
+  if (!appointment) {
+    throw new NotFoundError('Turno no encontrado');
+  }
+
+  const price = appointment.tipoCorte.price;
+  if (!price || price <= 0) {
+    throw new ConflictError(
+      'El tipo de corte de este turno no tiene precio configurado en Parametrizados, registralo manualmente desde Cortes'
+    );
+  }
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      let finalPrice = price;
+      let discountId: string | undefined;
+      let discountAmount: number | undefined;
+
+      const discount = appointment.discount;
+      if (
+        discount &&
+        discount.isActive &&
+        !discount.deletedAt &&
+        (discount.maxUses === null || discount.usesCount < discount.maxUses)
+      ) {
+        discountAmount = calculateCorteDiscountAmount(discount, price);
+        finalPrice = price - discountAmount;
+        discountId = discount.id;
+        await incrementUsesCount(tx, discount.id, discount.maxUses);
+      }
+
+      const created = await tx.cut.create({
+        data: {
+          clientId: appointment.clientId,
+          barberoId: appointment.barberoId,
+          tipoCorteId: appointment.tipoCorteId,
+          price: finalPrice,
+          discountId,
+          discountAmount,
+          appointmentId: appointment.id,
+          cutAt: new Date(),
+        },
+        include: CUT_INCLUDE,
+      });
+
+      await TreasuryService.recordIncomeFromCut(tx, created);
+
+      return created;
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      // Choco con otro request concurrente que ya lo creo - no es un error real.
+      const alreadyCreated = await prisma.cut.findUnique({ where: { appointmentId } });
+      if (alreadyCreated) return alreadyCreated;
+    }
+    throw error;
+  }
+}
+
 export function listCuts(user: AuthUser) {
   return prisma.cut.findMany({
     where: user.role === 'BARBERO' ? { barberoId: user.id } : undefined,
