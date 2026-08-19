@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const DISCOUNT_TYPES = ['PERCENTAGE', 'FIXED_AMOUNT', 'ITEM_PERCENTAGE', 'ITEM_FIXED_AMOUNT'] as const;
+const DISCOUNT_SCOPES = ['MERCH', 'CORTES', 'BOTH'] as const;
 
 const codeSchema = z
   .string()
@@ -14,6 +15,7 @@ export const createDiscountSchema = z.object({
   code: codeSchema.optional(),
   name: z.string().min(1, 'El nombre es requerido'),
   type: z.enum(DISCOUNT_TYPES),
+  scope: z.enum(DISCOUNT_SCOPES).optional(),
   value: z.number().int().positive('El valor debe ser mayor a 0'),
   maxDiscountAmount: z.number().int().positive('El tope debe ser mayor a 0').optional(),
   minOrderAmount: z.number().int().positive('El monto minimo debe ser mayor a 0').optional(),
@@ -35,10 +37,24 @@ const validateItemSchema = z.object({
   quantity: z.number().int().positive('La cantidad debe ser mayor a 0'),
 });
 
-export const validateDiscountSchema = z.object({
-  code: z.string().trim().min(1, 'El codigo es requerido'),
-  items: z.array(validateItemSchema).min(1, 'Agrega al menos un articulo'),
+const validateCorteSchema = z.object({
+  tipoCorteId: z.string().uuid('Tipo de corte invalido'),
 });
+
+// items (carrito de Merch) y corte (turno) son independientes entre si: el
+// wizard publico puede mandar uno, otro o los dos juntos (ver
+// discounts.service.ts validateDiscount, que evalua cada parte por separado
+// segun el scope del cupon).
+export const validateDiscountSchema = z
+  .object({
+    code: z.string().trim().min(1, 'El codigo es requerido'),
+    items: z.array(validateItemSchema).optional(),
+    corte: validateCorteSchema.optional(),
+  })
+  .refine((data) => (data.items && data.items.length > 0) || data.corte, {
+    message: 'Agrega al menos un articulo o un tipo de corte',
+    path: ['items'],
+  });
 
 export type CreateDiscountInput = z.infer<typeof createDiscountSchema>;
 export type UpdateDiscountInput = z.infer<typeof updateDiscountSchema>;

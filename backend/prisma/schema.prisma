@@ -107,6 +107,13 @@ model Appointment {
   scheduledAt     DateTime
   durationMinutes Int
   status          AppointmentStatus @default(PENDING)
+  // Reserva del cupon aplicado al confirmar el turno (ver
+  // discounts.service.ts / appointments.service.ts createAppointment): solo
+  // fija la intencion, el corte todavia no tiene precio. El monto real y el
+  // consumo (usesCount) se resuelven recien en cuts.service.ts createCut,
+  // que puede pasar mucho despues (el turno se abona en el local).
+  discountId      String?
+  discount        Discount?         @relation(fields: [discountId], references: [id])
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -127,7 +134,13 @@ model Cut {
   barbero       User          @relation(fields: [barberoId], references: [id])
   tipoCorteId   String
   tipoCorte     ParameterItem @relation(fields: [tipoCorteId], references: [id])
+  // price ya es el precio final (con descuento aplicado si corresponde) - ver
+  // cuts.service.ts createCut. discountId/discountAmount quedan solo como
+  // traza para reportes, no se usan para recalcular nada.
   price         Int
+  discountId      String?
+  discount        Discount?     @relation(fields: [discountId], references: [id])
+  discountAmount  Int?
   photoUrl      String?
   appointmentId String?       @unique
   appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
@@ -260,6 +273,12 @@ model Sale {
   appointmentId String?     @unique
   appointment   Appointment? @relation(fields: [appointmentId], references: [id])
   totalAmount   Int
+  // totalAmount ya viene con el descuento restado (POS: al crear la venta;
+  // Merch: al confirmar el turno vinculado, ver appointments.service.ts).
+  // discountId/discountAmount quedan como traza, no se usan para recalcular.
+  discountId     String?
+  discount       Discount?   @relation(fields: [discountId], references: [id])
+  discountAmount Int?
   createdAt     DateTime    @default(now())
 
   items         SaleItem[]
@@ -512,26 +531,44 @@ enum DiscountType {
 // se incrementa solo cuando el cupon se aplica a una compra confirmada (no en
 // cada validacion) - la integracion con Ventas/Merch queda para cuando ese
 // flujo exista. Soft delete via deletedAt: un cupon ya usado no se borra
-// fisico, para no perder trazabilidad en ventas historicas.
+// fisico, para no perder trazabilidad en ventas historicas. scope acota en
+// que flujo es valido el cupon: MERCH (carritos de Articulo, Ventas POS y
+// tienda publica), CORTES (turnos/servicios) o BOTH. applicableItems/
+// applicableCategories son conceptos exclusivos de MERCH (no tiene sentido
+// filtrar items en un cupon de un solo corte) - se rechazan si scope=CORTES,
+// ver discounts.service.ts assertDiscountBusinessRules. Default MERCH para
+// que los cupones creados antes de sumar scope no cambien de comportamiento.
+// maxUsesPerUser queda sin aplicar por ahora (ver discounts.service.ts).
 model Discount {
-  id                   String       @id @default(uuid())
-  code                 String       @unique
+  id                   String        @id @default(uuid())
+  code                 String        @unique
   name                 String
   type                 DiscountType
+  scope                DiscountScope @default(MERCH)
   value                Int
   maxDiscountAmount    Int?
   minOrderAmount       Int?
   maxUses              Int?
   maxUsesPerUser       Int?
-  usesCount            Int          @default(0)
-  applicableItems      String[]     @default([])
-  applicableCategories String[]     @default([])
+  usesCount            Int           @default(0)
+  applicableItems      String[]      @default([])
+  applicableCategories String[]      @default([])
   validFrom            DateTime?
   validUntil           DateTime?
-  isActive             Boolean      @default(true)
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  isActive             Boolean       @default(true)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
   deletedAt            DateTime?
 
+  appointments Appointment[]
+  cuts         Cut[]
+  sales        Sale[]
+
   @@map("discounts")
+}
+
+enum DiscountScope {
+  MERCH
+  CORTES
+  BOTH
 }

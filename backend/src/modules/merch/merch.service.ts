@@ -4,6 +4,7 @@ import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { StockService } from '../articles/stock.service.js';
 import { TreasuryService } from '../treasury/treasury.service.js';
+import { incrementUsesCount } from '../discounts/discounts.service.js';
 import type { CheckoutInput, UpdateMerchStatusInput } from './merch.schema.js';
 
 const MERCH_SALE_INCLUDE = {
@@ -110,5 +111,25 @@ export async function updateMerchOrderStatus(id: string, input: UpdateMerchStatu
     include: MERCH_SALE_INCLUDE,
   });
   const treasuryWarning = await TreasuryService.recordIncomeFromSale(updated);
+
+  // El uso del cupon (si el pedido tenia uno aplicado, ver
+  // appointments.service.ts applyDiscountToMerchSale) se cuenta recien aca,
+  // no al reservar - mismo criterio que TreasuryService.recordIncomeFromSale
+  // unas lineas arriba, para no contabilizar pedidos que terminan
+  // cancelados. Best-effort: un problema aca no debe romper la entrega.
+  if (updated.discountId) {
+    try {
+      const discount = await prisma.discount.findUnique({
+        where: { id: updated.discountId },
+        select: { maxUses: true },
+      });
+      if (discount) {
+        await incrementUsesCount(prisma, updated.discountId, discount.maxUses);
+      }
+    } catch (error) {
+      console.error('[DiscountService] No se pudo registrar el uso del cupon del pedido', updated.id, error);
+    }
+  }
+
   return treasuryWarning ? { ...updated, treasuryWarning } : updated;
 }

@@ -179,21 +179,27 @@ export async function listSlotsDisponiblesRequest(barberoId: string, fecha: stri
   );
 }
 
-export async function crearTurnoRequest(input: TurnoInput): Promise<Turno> {
-  const dto = await apiRequest<AppointmentDto>('/public/appointments', {
-    method: 'POST',
-    auth: false,
-    body: {
-      firstName: input.clienteNombre,
-      lastName: input.clienteApellido,
-      phone: input.clienteTelefono,
-      email: input.clienteEmail || undefined,
-      barberoId: input.barberoId,
-      tipoCorteId: input.tipoCorteId,
-      date: input.fecha,
-      time: input.hora,
-      merchSaleId: input.merchSaleId,
-    },
-  });
-  return toTurno(dto);
+export async function crearTurnoRequest(
+  input: TurnoInput
+): Promise<Turno & { discountApplied?: { corte: boolean; merch: boolean } }> {
+  const dto = await apiRequest<AppointmentDto & { discountApplied?: { corte: boolean; merch: boolean } }>(
+    '/public/appointments',
+    {
+      method: 'POST',
+      auth: false,
+      body: {
+        firstName: input.clienteNombre,
+        lastName: input.clienteApellido,
+        phone: input.clienteTelefono,
+        email: input.clienteEmail || undefined,
+        barberoId: input.barberoId,
+        tipoCorteId: input.tipoCorteId,
+        date: input.fecha,
+        time: input.hora,
+        merchSaleId: input.merchSaleId,
+        discountCode: input.discountCode,
+      },
+    }
+  );
+  return { ...toTurno(dto), discountApplied: dto.discountApplied };
 }

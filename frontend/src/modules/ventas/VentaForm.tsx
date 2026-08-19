@@ -11,6 +11,7 @@ import { listClientsRequest } from '../clients/clients.api';
 import type { Client } from '../clients/clients.types';
 import { formatCurrency } from '../../lib/format';
 import type { CrearVentaInput, CrearVentaItemInput } from './ventas.api';
+import { validateDiscountRequest, type ValidateDiscountResult } from '../discounts/discounts.api';
 import { useToast } from '../../components/toast/ToastProvider';
 import { getErrorMessage, getFieldError, type FieldIssue } from '../../lib/apiErrors';
 
@@ -47,6 +48,9 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
   const [itemIssues, setItemIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [clienteIssues, setClienteIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  const [discountCode, setDiscountCode] = useState('');
+  const [discountPreview, setDiscountPreview] = useState<ValidateDiscountResult | null>(null);
+  const [checkingDiscount, setCheckingDiscount] = useState(false);
 
   useEffect(() => {
     listPublicArticulosRequest().then((items) => {
@@ -103,6 +107,32 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
 
   const total = cart.reduce((sum, line) => sum + line.cantidad * line.precioUnitario, 0);
 
+  // El carrito cambio desde la ultima vez que se probo el cupon: el preview
+  // (calculado sobre el carrito de ese momento) ya no es confiable.
+  useEffect(() => {
+    setDiscountPreview(null);
+  }, [cart]);
+
+  async function handleAplicarCupon() {
+    if (!discountCode.trim() || cart.length === 0) return;
+    setCheckingDiscount(true);
+    setDiscountPreview(null);
+    try {
+      const result = await validateDiscountRequest({
+        code: discountCode.trim(),
+        items: cart.map((line) => ({ articleId: line.articuloId, quantity: line.cantidad })),
+      });
+      setDiscountPreview(result);
+      if (!result.valid) {
+        toast.error(result.reason ?? 'Cupon invalido');
+      }
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'No se pudo validar el cupon'));
+    } finally {
+      setCheckingDiscount(false);
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setClienteIssues(undefined);
@@ -136,6 +166,7 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
         })),
         clienteId: clienteModo === 'existente' ? clienteId : undefined,
         clienteNuevo: clienteNuevoPayload,
+        discountCode: discountCode.trim() || undefined,
       });
     } catch (err) {
       toast.error(getErrorMessage(err, 'No se pudo registrar la venta'));
@@ -233,8 +264,35 @@ export function VentaForm({ onSubmit, onCancel }: VentaFormProps) {
         </div>
       )}
 
+      <label htmlFor="discountCode">Cupon de descuento (opcional)</label>
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <input
+          id="discountCode"
+          value={discountCode}
+          onChange={(e) => setDiscountCode(e.target.value)}
+          placeholder="CODIGO"
+        />
+        <button
+          type="button"
+          onClick={handleAplicarCupon}
+          disabled={checkingDiscount || !discountCode.trim() || cart.length === 0}
+        >
+          {checkingDiscount ? 'Verificando...' : 'Aplicar'}
+        </button>
+      </div>
+      {discountPreview && (
+        <p className={discountPreview.valid ? 'text-muted' : 'form-error'}>
+          {discountPreview.valid && discountPreview.merch
+            ? `Cupon valido: -${formatCurrency(discountPreview.merch.discountAmount)}`
+            : (discountPreview.reason ?? 'Este cupon no aplica a este carrito')}
+        </p>
+      )}
+
       <p>
-        Total del carrito: <strong>{formatCurrency(total)}</strong>
+        Total del carrito:{' '}
+        <strong>
+          {formatCurrency(discountPreview?.valid && discountPreview.merch ? discountPreview.merch.total : total)}
+        </strong>
       </p>
 
       <h3>Cliente (opcional)</h3>

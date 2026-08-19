@@ -52,6 +52,7 @@ export interface CrearVentaInput {
   items: CrearVentaItemInput[];
   clienteId?: string;
   clienteNuevo?: ClienteVentaFormValues;
+  discountCode?: string;
 }
 
 export interface ListVentasFiltros {
@@ -83,6 +84,7 @@ export async function crearVentaRequest(
       })),
       clientId: input.clienteId,
       client: input.clienteNuevo,
+      discountCode: input.discountCode,
     },
   });
   return { ...toVenta(dto), treasuryWarning: dto.treasuryWarning };

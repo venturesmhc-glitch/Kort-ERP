@@ -58,4 +58,7 @@ export type TurnoInput = Omit<Turno, 'id' | 'codigo' | 'estado'> & {
   // public-store/store.types.ts), cuando el cliente paso por "ver mercancia"
   // antes de confirmar el turno.
   merchSaleId?: string;
+  // Cupon ingresado en el paso "Confirma tu turno" (ver discounts.service.ts):
+  // aplica al corte, y si hay merchSaleId, tambien al pedido de merch.
+  discountCode?: string;
 };

@@ -1,8 +1,9 @@
 import { Prisma } from '@prisma/client';
-import type { AppointmentStatus, DayOfWeek } from '@prisma/client';
+import type { AppointmentStatus, DayOfWeek, Discount } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
+import { calculateDiscountAmount, resolveEligibleDiscount } from '../discounts/discounts.service.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import type {
   CreateAppointmentInput,
@@ -209,6 +210,78 @@ async function attachMerchSaleIfValid(merchSaleId: string, appointmentId: string
   });
 }
 
+// Aplica el cupon (scope MERCH/BOTH) al pedido de merch que ya existe (se
+// creo en el checkout de la tienda, antes de este paso del wizard) -
+// totalAmount queda con el descuento restado desde ya, pero usesCount no se
+// incrementa aca: se difiere a merch.service.ts updateMerchOrderStatus en la
+// transicion a DELIVERED, para no contabilizar pedidos que terminan
+// CANCELLED (mismo criterio que TreasuryService.recordIncomeFromSale).
+async function applyDiscountToMerchSale(discount: Discount, saleId: string): Promise<boolean> {
+  const sale = await prisma.sale.findFirst({
+    where: { id: saleId, channel: 'MERCH', status: 'PENDING_PICKUP', discountId: null },
+    include: { items: { include: { article: { select: { tipoProductoId: true } } } } },
+  });
+  if (!sale) {
+    return false;
+  }
+
+  if (discount.minOrderAmount !== null && sale.totalAmount < discount.minOrderAmount) {
+    return false;
+  }
+
+  const pricedItems = sale.items.map((item) => ({
+    articleId: item.articleId,
+    tipoProductoId: item.article.tipoProductoId,
+    quantity: item.quantity,
+    subtotal: item.subtotal,
+  }));
+  const discountAmount = calculateDiscountAmount(discount, pricedItems, sale.totalAmount);
+  if (discountAmount <= 0) {
+    return false;
+  }
+
+  await prisma.sale.update({
+    where: { id: sale.id },
+    data: { discountId: discount.id, discountAmount, totalAmount: sale.totalAmount - discountAmount },
+  });
+  return true;
+}
+
+// Reserva el cupon para el turno (ver Appointment.discountId en el schema) y,
+// si corresponde, lo aplica ya mismo al pedido de merch vinculado. Best-effort
+// a proposito: un problema con el cupon nunca debe tirar abajo la reserva del
+// turno (mismo espiritu que attachMerchSaleIfValid).
+async function applyDiscountCode(
+  appointmentId: string,
+  discountCode: string,
+  merchSaleId: string | undefined
+): Promise<{ corte: boolean; merch: boolean }> {
+  try {
+    const eligible = await resolveEligibleDiscount(discountCode);
+    if (!eligible.ok) {
+      return { corte: false, merch: false };
+    }
+    const { discount } = eligible;
+
+    let corte = false;
+    let merch = false;
+
+    if (discount.scope === 'CORTES' || discount.scope === 'BOTH') {
+      await prisma.appointment.update({ where: { id: appointmentId }, data: { discountId: discount.id } });
+      corte = true;
+    }
+
+    if ((discount.scope === 'MERCH' || discount.scope === 'BOTH') && merchSaleId) {
+      merch = await applyDiscountToMerchSale(discount, merchSaleId);
+    }
+
+    return { corte, merch };
+  } catch (error) {
+    console.error('[DiscountService] No se pudo aplicar el cupon al turno', error);
+    return { corte: false, merch: false };
+  }
+}
+
 export async function createAppointment(input: CreateAppointmentInput) {
   await getBarbero(input.barberoId);
 
@@ -285,10 +358,15 @@ export async function createAppointment(input: CreateAppointmentInput) {
     await attachMerchSaleIfValid(input.merchSaleId, appointment.id);
   }
 
+  let discountApplied = { corte: false, merch: false };
+  if (input.discountCode) {
+    discountApplied = await applyDiscountCode(appointment.id, input.discountCode, input.merchSaleId);
+  }
+
   await NotificationService.sendAppointmentConfirmation(appointment);
   await NotificationService.scheduleAppointmentReminder(appointment);
 
-  return appointment;
+  return { ...appointment, discountApplied };
 }
 
 export function listAppointments(user: AuthUser) {

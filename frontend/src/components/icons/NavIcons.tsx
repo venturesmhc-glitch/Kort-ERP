@@ -208,6 +208,15 @@ export function IconScissors(props: IconProps) {
   );
 }
 
+export function IconDiscount(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 9.5V4.5a1.5 1.5 0 0 1 1.5-1.5h5L15 8.5a1.5 1.5 0 0 1 0 2.1l-4.4 4.4a1.5 1.5 0 0 1-2.1 0L3 9.5Z" />
+      <circle cx="7" cy="7" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function IconMore(props: IconProps) {
   return (
     <svg {...base} {...props}>

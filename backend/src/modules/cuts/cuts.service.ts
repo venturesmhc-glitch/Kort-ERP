@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { TreasuryService } from '../treasury/treasury.service.js';
+import { calculateCorteDiscountAmount, incrementUsesCount } from '../discounts/discounts.service.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import type { CreateCutInput } from './cuts.schema.js';
 
@@ -44,13 +45,39 @@ export async function createCut(input: CreateCutInput, user: AuthUser) {
 
   try {
     const cut = await prisma.$transaction(async (tx) => {
+      let finalPrice = price;
+      let discountId: string | undefined;
+      let discountAmount: number | undefined;
+
       if (input.appointmentId) {
-        const appointment = await tx.appointment.findUnique({ where: { id: input.appointmentId } });
+        const appointment = await tx.appointment.findUnique({
+          where: { id: input.appointmentId },
+          include: { discount: true },
+        });
         if (!appointment) {
           throw new NotFoundError('Turno no encontrado');
         }
         if (appointment.barberoId !== input.barberoId || appointment.clientId !== client.id) {
           throw new ConflictError('El turno no pertenece a ese barbero y cliente');
+        }
+
+        // El cupon se reservo al confirmar el turno (ver
+        // appointments.service.ts applyDiscountCode); aca se redime de
+        // verdad, sea el mismo dia o mucho despues. No se re-chequea vigencia
+        // por fecha a proposito: el cupon ya se comprometio a este turno y un
+        // corte tiene que poder completarse igual si vencio en el medio -
+        // solo se valida que siga activo, no borrado y con usos disponibles.
+        const discount = appointment.discount;
+        if (
+          discount &&
+          discount.isActive &&
+          !discount.deletedAt &&
+          (discount.maxUses === null || discount.usesCount < discount.maxUses)
+        ) {
+          discountAmount = calculateCorteDiscountAmount(discount, price);
+          finalPrice = price - discountAmount;
+          discountId = discount.id;
+          await incrementUsesCount(tx, discount.id, discount.maxUses);
         }
       }
 
@@ -59,7 +86,9 @@ export async function createCut(input: CreateCutInput, user: AuthUser) {
           clientId: client.id,
           barberoId: input.barberoId,
           tipoCorteId: input.tipoCorteId,
-          price,
+          price: finalPrice,
+          discountId,
+          discountAmount,
           photoUrl: input.photoUrl,
           appointmentId: input.appointmentId,
           cutAt,

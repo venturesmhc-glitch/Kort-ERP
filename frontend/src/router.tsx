@@ -24,6 +24,7 @@ import { PurchaseOrderDetailPage } from './modules/purchase-orders/PurchaseOrder
 import { ReportsPage } from './modules/reports/ReportsPage';
 import { PlanSettingsPage } from './modules/plan/PlanSettingsPage';
 import { BusinessSettingsPage } from './modules/business-settings/BusinessSettingsPage';
+import { DiscountsPage } from './modules/discounts/DiscountsPage';
 
 export const router = createBrowserRouter([
   {
@@ -68,6 +69,7 @@ export const router = createBrowserRouter([
             children: [
               { path: 'articulos', element: <ArticulosPage /> },
               { path: 'ventas', element: <VentasPage /> },
+              { path: 'descuentos', element: <DiscountsPage /> },
               { path: 'tesoreria', element: <TesoreriaPage /> },
               { path: 'parametrizados', element: <ParametrizadosPage /> },
               { path: 'usuarios', element: <UsersPage /> },

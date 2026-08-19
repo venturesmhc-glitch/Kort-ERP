@@ -9,11 +9,12 @@ import type { CatalogItem } from '../catalogs/catalogs.types';
 import { crearTurnoRequest, listSlotsDisponiblesRequest } from '../turnos/turnos.api';
 import type { Turno } from '../turnos/turnos.types';
 import { clearPendingMerchSaleId, loadPendingMerchSaleId } from '../public-store/store.types';
-import { formatDate, shiftIso, todayIso } from '../../lib/format';
+import { formatDate, formatCurrency, shiftIso, todayIso } from '../../lib/format';
 import { ErrorState, Skeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
 import { useBusinessSettings } from '../business-settings/BusinessSettingsContext';
 import { useBusinessTheme } from '../../config/useBusinessTheme';
+import { validateDiscountRequest, type ValidateDiscountResult } from '../discounts/discounts.api';
 
 const TODAY = todayIso();
 const STEP_LABELS = ['Tus datos', 'Profesional', 'Fecha y horario', 'Servicio', 'Confirmar'];
@@ -76,6 +77,9 @@ export function TurnoWizardPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [turnoConfirmado, setTurnoConfirmado] = useState<Turno | null>(null);
+  const [discountCode, setDiscountCode] = useState('');
+  const [discountPreview, setDiscountPreview] = useState<ValidateDiscountResult | null>(null);
+  const [checkingDiscount, setCheckingDiscount] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [initialError, setInitialError] = useState<string | null>(null);
 
@@ -180,10 +184,32 @@ export function TurnoWizardPage() {
     navigate('/tienda?turno=1');
   }
 
+  async function handleAplicarCupon() {
+    if (!discountCode.trim()) return;
+    setCheckingDiscount(true);
+    setDiscountPreview(null);
+    try {
+      const result = await validateDiscountRequest({
+        code: discountCode.trim(),
+        corte: { tipoCorteId },
+      });
+      setDiscountPreview(result);
+      if (!result.valid) {
+        toast.error(result.reason ?? 'Cupon invalido');
+      }
+    } catch (err) {
+      toast.error(toErrorMessage(err, 'No se pudo validar el cupon'));
+    } finally {
+      setCheckingDiscount(false);
+    }
+  }
+
   async function handleConfirmar() {
     setError(null);
     setConfirming(true);
     try {
+      const merchSaleId = loadPendingMerchSaleId() ?? undefined;
+      const codigoIngresado = discountCode.trim() || undefined;
       const turno = await crearTurnoRequest({
         clienteNombre: cliente.nombre,
         clienteApellido: cliente.apellido,
@@ -195,10 +221,17 @@ export function TurnoWizardPage() {
         hora,
         tipoCorteId,
         tipoCorteNombre,
-        merchSaleId: loadPendingMerchSaleId() ?? undefined,
+        merchSaleId,
+        discountCode: codigoIngresado,
       });
       clearTurnoDraft();
       clearPendingMerchSaleId();
+      // El resultado real de la aplicacion (no el preview) viaja en
+      // discountApplied: un cupon puede haber quedado sin usos entre que se
+      // valido y se confirmo el turno.
+      if (codigoIngresado && !turno.discountApplied?.corte && !turno.discountApplied?.merch) {
+        toast.error('El cupon no se pudo aplicar');
+      }
       setTurnoConfirmado(turno);
       setStep(6);
     } catch (err) {
@@ -513,6 +546,37 @@ export function TurnoWizardPage() {
             <p className="text-muted">
               Se abona en el local. {cliente.nombre} {cliente.apellido} · {cliente.telefono}
             </p>
+
+            <label className="wizard-field" htmlFor="discountCode">
+              <span>Cupon de descuento (opcional)</span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  id="discountCode"
+                  value={discountCode}
+                  onChange={(e) => {
+                    setDiscountCode(e.target.value);
+                    setDiscountPreview(null);
+                  }}
+                  placeholder="CODIGO"
+                  disabled={confirming}
+                />
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={handleAplicarCupon}
+                  disabled={checkingDiscount || confirming || !discountCode.trim()}
+                >
+                  {checkingDiscount ? 'Verificando...' : 'Aplicar'}
+                </button>
+              </div>
+            </label>
+            {discountPreview && (
+              <p className={discountPreview.valid ? 'text-muted' : 'form-error'}>
+                {discountPreview.valid && discountPreview.corte
+                  ? `Cupon valido: -${formatCurrency(discountPreview.corte.discountAmount)} en tu corte`
+                  : (discountPreview.reason ?? 'Este cupon no aplica a tu turno')}
+              </p>
+            )}
 
             <div className="wizard-upsell">
               <span>¿Queres ver la tienda de merchandising antes de confirmar?</span>

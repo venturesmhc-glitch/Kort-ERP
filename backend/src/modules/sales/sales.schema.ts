@@ -23,6 +23,7 @@ export const createSaleSchema = z
     items: z.array(saleItemSchema).min(1, 'Agrega al menos un articulo'),
     clientId: z.string().uuid('Cliente invalido').optional(),
     client: newClientSchema.optional(),
+    discountCode: z.string().trim().min(1, 'El codigo es requerido').optional(),
   })
   .refine((data) => !(data.clientId && data.client), {
     message: 'Elegi un cliente existente o cargá uno nuevo, no ambos',

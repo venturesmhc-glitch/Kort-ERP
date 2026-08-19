@@ -1,9 +1,11 @@
 import { Prisma } from '@prisma/client';
+import type { Discount } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
-import { NotFoundError } from '../../utils/errors.js';
+import { AppError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { StockService } from '../articles/stock.service.js';
 import { TreasuryService } from '../treasury/treasury.service.js';
+import { calculateDiscountAmount, incrementUsesCount, resolveEligibleDiscount } from '../discounts/discounts.service.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import type { CreateSaleInput, ListSalesQuery } from './sales.schema.js';
 
@@ -39,11 +41,41 @@ export async function createSale(input: CreateSaleInput, user: AuthUser) {
     const unitPrice = item.unitPrice ?? article.price;
     return { ...item, unitPrice, subtotal: unitPrice * item.quantity };
   });
-  const totalAmount = itemsWithPrice.reduce((sum, item) => sum + item.subtotal, 0);
+  const cartTotal = itemsWithPrice.reduce((sum, item) => sum + item.subtotal, 0);
+
+  // A diferencia del wizard/checkout publico (best-effort, un cupon invalido
+  // simplemente no se aplica), aca es personal autenticado cargando una
+  // venta: un codigo invalido tiene que ser un error visible que bloquea la
+  // venta, no un descuento que se pierde en silencio.
+  let discount: Discount | null = null;
+  let discountAmount = 0;
+  if (input.discountCode) {
+    const eligible = await resolveEligibleDiscount(input.discountCode);
+    if (!eligible.ok) {
+      throw new AppError(eligible.reason);
+    }
+    if (eligible.discount.scope !== 'MERCH' && eligible.discount.scope !== 'BOTH') {
+      throw new AppError('Este cupon no aplica a productos');
+    }
+    if (eligible.discount.minOrderAmount !== null && cartTotal < eligible.discount.minOrderAmount) {
+      throw new AppError('No se alcanzo el monto minimo de compra para este cupon');
+    }
+    discount = eligible.discount;
+    const pricedItems = itemsWithPrice.map((item) => ({
+      articleId: item.articleId,
+      tipoProductoId: articleMap.get(item.articleId)!.tipoProductoId,
+      quantity: item.quantity,
+      subtotal: item.subtotal,
+    }));
+    discountAmount = calculateDiscountAmount(discount, pricedItems, cartTotal);
+  }
+  const totalAmount = cartTotal - discountAmount;
 
   // Todo dentro de una sola transaccion: si a StockService.decreaseStock le
   // falta stock para cualquier item, tira y se revierte la venta completa
   // (Sale + SaleItem incluidos) - ver stock.service.ts para el soporte de tx.
+  // El canal POS no tiene ciclo de vida (es COMPLETED de una), asi que el
+  // cupon se redime (incrementUsesCount) ya mismo, en la misma transaccion.
   const sale = await prisma.$transaction(async (tx) => {
     const created = await tx.sale.create({
       data: {
@@ -51,6 +83,8 @@ export async function createSale(input: CreateSaleInput, user: AuthUser) {
         clientId,
         sellerId: user.id,
         totalAmount,
+        discountId: discount?.id,
+        discountAmount: discount ? discountAmount : undefined,
         items: {
           create: itemsWithPrice.map((item) => ({
             articleId: item.articleId,
@@ -65,6 +99,10 @@ export async function createSale(input: CreateSaleInput, user: AuthUser) {
 
     for (const item of itemsWithPrice) {
       await StockService.decreaseStock(item.articleId, item.quantity, `Venta ${created.id}`, tx);
+    }
+
+    if (discount) {
+      await incrementUsesCount(tx, discount.id, discount.maxUses);
     }
 
     return created;

@@ -24,6 +24,9 @@ export const createAppointmentSchema = z.object({
   // Vinculo opcional con un pedido de merch ya confirmado desde el flujo "ver
   // mercancia" del wizard (ver merch.service.ts / StorePage.tsx).
   merchSaleId: z.string().uuid('Pedido invalido').optional(),
+  // Codigo de cupon opcional ingresado en el paso "Confirma tu turno" del
+  // wizard (ver discounts.service.ts / appointments.service.ts).
+  discountCode: z.string().trim().min(1, 'El codigo es requerido').optional(),
 });
 
 export const updateAppointmentStatusSchema = z.object({
