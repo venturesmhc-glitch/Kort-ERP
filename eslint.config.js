@@ -7,7 +7,16 @@ import globals from 'globals';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/build/**', '**/node_modules/**', '**/generated/**'],
+    // design_handoff_kort_ui/support.js es un bundle GENERADO (dc-runtime),
+    // referencia de diseno para recrear a mano en frontend/src - no es
+    // codigo de produccion, no vale la pena lintearlo.
+    ignores: [
+      '**/dist/**',
+      '**/build/**',
+      '**/node_modules/**',
+      '**/generated/**',
+      'design_handoff_kort_ui/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

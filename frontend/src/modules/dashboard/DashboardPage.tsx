@@ -5,7 +5,7 @@ import { listStockBajoRequest } from '../articulos/articulos.api';
 import { listVentasRequest } from '../ventas/ventas.api';
 import { listCortesRequest } from '../cortes/cortes.api';
 import type { Turno } from '../turnos/turnos.types';
-import { nivelStock, type Articulo } from '../articulos/articulos.types';
+import type { Articulo } from '../articulos/articulos.types';
 import { formatCurrency, todayIso } from '../../lib/format';
 import { addMinutes, nowMinutes, timeToMinutes } from '../turnos/agenda.utils';
 import { useAuth } from '../auth/AuthContext';

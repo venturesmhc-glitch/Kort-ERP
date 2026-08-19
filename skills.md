@@ -146,10 +146,27 @@ stock al momento de la compra (antes o después del turno).
 
 ## 8. Pendientes / decisiones a tomar antes de codear
 
-- Proveedor de hosting/infraestructura y almacenamiento de imágenes (S3, Cloudinary,
-  disco local, etc.).
-- Proveedor de WhatsApp Business API a integrar para los recordatorios.
-- Proveedor de correo transaccional para la confirmación de turno.
-- Definir si el "código de turno único" es correlativo, hash corto o UUID visible al cliente.
-- Definir estructura exacta de permisos por ruta (middleware JWT) para Dev/Encargado/Barbero.
-- Definir el modelo de datos de "parametrizados" (tabla genérica vs. tablas por catálogo).
+Actualizado 2026-08-19 (ver `docs/auditoria-2026-08-19.md`): de las 6 decisiones originales,
+4 ya estan resueltas en el codigo. Quedan pendientes solo las dos de abajo, y de esas dos
+la parte de codigo (integracion + scheduler) tambien esta resuelta - lo unico que falta es
+el alta de cuenta del lado del proveedor, que es un paso manual e inevitable (no de este
+repo).
+
+- **Proveedor de correo transaccional:** resuelto en codigo via Resend (ver
+  `backend/src/lib/notifications/emailProvider.ts`). Falta cargar `RESEND_API_KEY` en
+  produccion (alta de cuenta en resend.com, ver `.env.production.example`).
+- **Proveedor de WhatsApp Business API:** resuelto en codigo via WhatsApp Cloud API (Meta),
+  incluyendo el mecanismo de scheduling que faltaba (recordatorio 6hs antes, ver
+  `backend/src/modules/notifications/scheduler.service.ts` + modelo `ScheduledNotification`).
+  Falta el alta de cuenta de Meta Business + aprobacion de la plantilla de mensaje (proceso
+  manual de Meta, puede tardar hasta 24hs) y cargar `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID`
+  en produccion.
+- ~~Proveedor de hosting/infraestructura y almacenamiento de imágenes~~ — resuelto: Render
+  (backend) + Vercel (frontend) + Supabase Storage en produccion, disco local en dev.
+- ~~Definir si el "código de turno único" es correlativo, hash corto o UUID~~ — resuelto:
+  alfanumerico de 6 caracteres sin ambigüedad visual, no correlativo, no UUID (ver
+  `appointments.service.ts`).
+- ~~Definir estructura exacta de permisos por ruta~~ — resuelto: middleware `verifyToken` +
+  `authorize(...)` por rol, consistente en los 18 modulos de rutas.
+- ~~Definir el modelo de datos de "parametrizados"~~ — resuelto: tabla generica
+  `ParameterCategory`/`ParameterItem`, sin catalogos hardcodeados.

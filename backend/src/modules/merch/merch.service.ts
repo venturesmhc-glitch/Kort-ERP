@@ -105,18 +105,29 @@ export async function updateMerchOrderStatus(id: string, input: UpdateMerchStatu
     return getMerchOrder(id);
   }
 
-  const updated = await prisma.sale.update({
-    where: { id: sale.id },
-    data: { status: 'DELIVERED' },
-    include: MERCH_SALE_INCLUDE,
+  // La entrega (status DELIVERED) y el ingreso en Tesoreria quedan atomicos
+  // en una misma transaccion, igual que Ventas/Cortes (ver sales.service.ts,
+  // cuts.service.ts) - si falta la categoria de ingresos en Parametrizados,
+  // la entrega completa se revierte en vez de quedar guardada sin su
+  // movimiento asociado.
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.sale.update({
+      where: { id: sale.id },
+      data: { status: 'DELIVERED' },
+      include: MERCH_SALE_INCLUDE,
+    });
+
+    await TreasuryService.recordIncomeFromSale(tx, result);
+
+    return result;
   });
-  const treasuryWarning = await TreasuryService.recordIncomeFromSale(updated);
 
   // El uso del cupon (si el pedido tenia uno aplicado, ver
   // appointments.service.ts applyDiscountToMerchSale) se cuenta recien aca,
-  // no al reservar - mismo criterio que TreasuryService.recordIncomeFromSale
-  // unas lineas arriba, para no contabilizar pedidos que terminan
-  // cancelados. Best-effort: un problema aca no debe romper la entrega.
+  // no al reservar - mismo criterio que TreasuryService de arriba, para no
+  // contabilizar pedidos que terminan cancelados. Best-effort y fuera de la
+  // transaccion a proposito: un problema con el conteo del cupon no debe
+  // poder revertir una entrega que ya se le confirmo al cliente.
   if (updated.discountId) {
     try {
       const discount = await prisma.discount.findUnique({
@@ -131,5 +142,5 @@ export async function updateMerchOrderStatus(id: string, input: UpdateMerchStatu
     }
   }
 
-  return treasuryWarning ? { ...updated, treasuryWarning } : updated;
+  return updated;
 }

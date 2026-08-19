@@ -4,6 +4,8 @@ import { prisma } from '../../lib/prisma.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { calculateDiscountAmount, resolveEligibleDiscount } from '../discounts/discounts.service.js';
+import { getBusinessSettings } from '../business-settings/business-settings.service.js';
+import { sendEmail } from '../../lib/notifications/emailProvider.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import type {
   CreateAppointmentInput,
@@ -51,19 +53,86 @@ function isUniqueConstraintError(
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
 
-// Ganchos de notificacion: la integracion con proveedores reales (mail, WhatsApp
-// Business API) es una etapa posterior del roadmap. Por ahora quedan como no-op
-// con log, listos para conectar el proveedor real sin tocar el resto del flujo.
+interface AppointmentForNotification {
+  id: string;
+  code: string;
+  scheduledAt: Date;
+  client: { firstName: string; lastName: string; phone: string; email: string | null };
+  barbero: { firstName: string; lastName: string };
+  tipoCorte: { name: string };
+}
+
+const REMINDER_LEAD_MS = 6 * 60 * 60 * 1000;
+
+function formatAppointmentDate(scheduledAt: Date): string {
+  return scheduledAt.toLocaleString('es-AR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function confirmationEmailHtml(appointment: AppointmentForNotification, businessName: string): string {
+  const fecha = formatAppointmentDate(appointment.scheduledAt);
+  return `
+    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2>${businessName}</h2>
+      <p>Hola ${appointment.client.firstName}, tu turno quedo confirmado.</p>
+      <ul>
+        <li><strong>Fecha:</strong> ${fecha}</li>
+        <li><strong>Con:</strong> ${appointment.barbero.firstName} ${appointment.barbero.lastName}</li>
+        <li><strong>Servicio:</strong> ${appointment.tipoCorte.name}</li>
+        <li><strong>Codigo de turno:</strong> ${appointment.code}</li>
+      </ul>
+      <p>Te vamos a escribir por WhatsApp unas horas antes como recordatorio.</p>
+    </div>
+  `;
+}
+
+// Confirmacion por mail (sincrona, best-effort) y recordatorio por WhatsApp
+// (programado, ver ScheduledNotification + notifications/scheduler.service.ts
+// para el disparo real 6hs antes). Ninguno de los dos debe poder tumbar la
+// creacion/reprogramacion del turno: ambos absorben sus propios errores.
 export const NotificationService = {
-  async sendAppointmentConfirmation(appointment: { code: string; scheduledAt: Date }) {
-    console.log(
-      `[NotificationService] Mail de confirmacion turno ${appointment.code} (${appointment.scheduledAt.toISOString()}) - no-op, falta integrar proveedor de mail`
-    );
+  async sendAppointmentConfirmation(appointment: AppointmentForNotification) {
+    if (!appointment.client.email) return;
+    try {
+      const business = await getBusinessSettings();
+      await sendEmail({
+        to: appointment.client.email,
+        subject: `Turno confirmado - ${business.name}`,
+        html: confirmationEmailHtml(appointment, business.name),
+      });
+    } catch (error) {
+      console.error('[NotificationService] No se pudo enviar el mail de confirmacion', error);
+    }
   },
-  async scheduleAppointmentReminder(appointment: { code: string; scheduledAt: Date }) {
-    console.log(
-      `[NotificationService] Recordatorio WhatsApp turno ${appointment.code} programado 6hs antes de ${appointment.scheduledAt.toISOString()} - no-op, falta integrar proveedor de WhatsApp`
-    );
+  async scheduleAppointmentReminder(appointment: AppointmentForNotification) {
+    const sendAt = new Date(appointment.scheduledAt.getTime() - REMINDER_LEAD_MS);
+    if (sendAt <= new Date()) {
+      // El turno es en menos de 6hs: no tiene sentido programar un
+      // recordatorio que ya venceria al crearse.
+      return;
+    }
+    try {
+      await prisma.scheduledNotification.create({
+        data: { appointmentId: appointment.id, channel: 'WHATSAPP', sendAt },
+      });
+    } catch (error) {
+      console.error('[NotificationService] No se pudo programar el recordatorio de WhatsApp', error);
+    }
+  },
+  async cancelPendingReminders(appointmentId: string) {
+    try {
+      await prisma.scheduledNotification.updateMany({
+        where: { appointmentId, channel: 'WHATSAPP', status: 'PENDING' },
+        data: { status: 'CANCELLED' },
+      });
+    } catch (error) {
+      console.error('[NotificationService] No se pudieron cancelar los recordatorios pendientes', error);
+    }
   },
 };
 
@@ -394,11 +463,17 @@ export async function updateAppointmentStatus(
   user: AuthUser
 ) {
   const appointment = await getOwnedAppointment(id, user);
-  return prisma.appointment.update({
+  const updated = await prisma.appointment.update({
     where: { id: appointment.id },
     data: { status: input.status as AppointmentStatus },
     include: APPOINTMENT_INCLUDE,
   });
+
+  if (input.status === 'CANCELLED') {
+    await NotificationService.cancelPendingReminders(updated.id);
+  }
+
+  return updated;
 }
 
 export async function rescheduleAppointment(
@@ -418,8 +493,9 @@ export async function rescheduleAppointment(
 
   const scheduledAt = combineDateTime(input.date, input.time);
 
+  let updated;
   try {
-    return await prisma.appointment.update({
+    updated = await prisma.appointment.update({
       where: { id: appointment.id },
       data: { scheduledAt, status: 'PENDING' },
       include: APPOINTMENT_INCLUDE,
@@ -430,4 +506,11 @@ export async function rescheduleAppointment(
     }
     throw error;
   }
+
+  // El recordatorio viejo (6hs antes del horario anterior) ya no aplica -
+  // se cancela y se programa uno nuevo relativo al horario reprogramado.
+  await NotificationService.cancelPendingReminders(updated.id);
+  await NotificationService.scheduleAppointmentReminder(updated);
+
+  return updated;
 }

@@ -186,59 +186,57 @@ export async function getSummary(query: TreasurySummaryQuery) {
   };
 }
 
+type TxClient = Prisma.TransactionClient;
+
 async function recordIncome(
+  tx: TxClient,
   type: { name: string; description: string },
   amount: number,
   source: 'CUT' | 'SALE',
   linkId: { cutId?: string; saleId?: string }
-): Promise<string | undefined> {
-  try {
-    const category = await prisma.parameterItem.findFirst({
-      where: { category: { key: 'categorias-ingresos' }, name: type.name, deletedAt: null },
-    });
-    if (!category) {
-      const warning = `No se encontro la categoria de ingresos "${type.name}" en Parametrizados: el ${
-        source === 'CUT' ? 'corte' : 'la venta'
-      } se guardo pero no genero movimiento en Tesoreria.`;
-      console.error(`[TreasuryService] ${warning}`);
-      return warning;
-    }
-
-    await prisma.treasuryEntry.create({
-      data: {
-        type: 'INCOME',
-        categoryId: category.id,
-        amount,
-        description: type.description,
-        entryDate: new Date(),
-        source,
-        ...linkId,
-      },
-    });
-    return undefined;
-  } catch (error) {
-    console.error(`[TreasuryService] Error registrando ingreso automatico (${source})`, error);
-    return 'Ocurrio un error registrando el ingreso en Tesoreria. Revisalo manualmente.';
+): Promise<void> {
+  const category = await tx.parameterItem.findFirst({
+    where: { category: { key: 'categorias-ingresos' }, name: type.name, deletedAt: null },
+  });
+  if (!category) {
+    throw new ConflictError(
+      `No se encontro la categoria de ingresos "${type.name}" en Parametrizados. Cargala en ` +
+        `Parametrizados antes de registrar este ${source === 'CUT' ? 'corte' : 'pedido/venta'}.`
+    );
   }
+
+  await tx.treasuryEntry.create({
+    data: {
+      type: 'INCOME',
+      categoryId: category.id,
+      amount,
+      description: type.description,
+      entryDate: new Date(),
+      source,
+      ...linkId,
+    },
+  });
 }
 
-// Implementacion real de los hooks que Cortes y Ventas ya invocan (ver
-// cuts.service.ts y sales.service.ts). Se ejecutan despues de que la
-// transaccion principal (corte/venta) ya commiteo, y absorben sus propios
-// errores para no tumbar esa respuesta por un problema de Tesoreria (ej.
-// categoria de ingresos borrada) - el corte/venta ya quedo guardado.
+// Ganchos que Cortes/Ventas/Merch invocan dentro de su propia transaccion
+// (ver cuts.service.ts, sales.service.ts, merch.service.ts): si falta la
+// categoria de ingresos en Parametrizados, tx.create tira y la transaccion
+// completa (corte/venta + movimiento de tesoreria) se revierte junta - ya no
+// puede quedar un corte/venta guardado sin su movimiento asociado (antes era
+// un warning best-effort post-commit, ver auditoria 2026-08-19 #2.2).
 export const TreasuryService = {
-  /** Devuelve un mensaje de warning si no se pudo registrar el ingreso, o undefined si salio bien. */
-  recordIncomeFromCut(cut: { id: string; price: number }) {
+  recordIncomeFromCut(tx: TxClient, cut: { id: string; price: number }) {
     return recordIncome(
+      tx,
       { name: 'Cortes', description: `Ingreso por corte ${cut.id}` },
       cut.price,
       'CUT',
       { cutId: cut.id }
     );
   },
-  recordIncomeFromSale(sale: { id: string; totalAmount: number }) {
+  recordIncomeFromSale(tx: TxClient, sale: { id: string; totalAmount: number }) {
     return recordIncome(
+      tx,
       { name: 'Ventas merchandising', description: `Ingreso por venta ${sale.id}` },
       sale.totalAmount,
       'SALE',

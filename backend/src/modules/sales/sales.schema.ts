@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paginationQuerySchema } from '../../utils/pagination.js';
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -30,7 +31,7 @@ export const createSaleSchema = z
     path: ['client'],
   });
 
-export const listSalesQuerySchema = z.object({
+export const listSalesQuerySchema = paginationQuerySchema.extend({
   dateFrom: z.string().regex(dateRegex, 'Fecha invalida (YYYY-MM-DD)').optional(),
   dateTo: z.string().regex(dateRegex, 'Fecha invalida (YYYY-MM-DD)').optional(),
   articleId: z.string().uuid().optional(),

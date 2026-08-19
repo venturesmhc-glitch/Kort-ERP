@@ -24,7 +24,6 @@ import {
   IconBusiness,
   IconDiscount,
   IconPlan,
-  IconMore,
   IconClose,
   IconLogout,
   IconExternal,

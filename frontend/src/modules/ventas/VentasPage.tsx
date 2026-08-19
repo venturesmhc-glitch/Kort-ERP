@@ -62,18 +62,16 @@ export function VentasPage() {
   }, []);
 
   async function handleCreate(values: CrearVentaInput) {
-    const venta = await crearVentaRequest(values);
+    await crearVentaRequest(values);
     setShowForm(false);
     await loadVentas(filtros);
-    if (venta.treasuryWarning) alert(venta.treasuryWarning);
   }
 
   async function handleEntregarMerch(id: string) {
     try {
-      const pedido = await marcarMerchEntregadoRequest(id);
+      await marcarMerchEntregadoRequest(id);
       loadPedidosMerch();
       await loadVentas(filtros);
-      if (pedido.treasuryWarning) alert(pedido.treasuryWarning);
     } catch (err) {
       toast.error(toErrorMessage(err, 'No se pudo entregar el pedido.'));
     }

@@ -19,7 +19,6 @@ import { validateDiscountRequest, type ValidateDiscountResult } from '../discoun
 const TODAY = todayIso();
 const STEP_LABELS = ['Tus datos', 'Profesional', 'Fecha y horario', 'Servicio', 'Confirmar'];
 const DAY_OPTIONS = Array.from({ length: 5 }, (_, i) => shiftIso(TODAY, i));
-const ANY_BARBERO = 'any';
 
 const EMPTY_CLIENTE: ClienteStepFormValues = { nombre: '', apellido: '', telefono: '', email: '' };
 

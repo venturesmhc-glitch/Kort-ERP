@@ -1,0 +1,31 @@
+name: CI
+
+# Gate de calidad sobre PRs y pushes a main: lint + typecheck + build de los
+# 3 workspaces (packages/shared, backend, frontend). Antes de esto el unico
+# control automatico era el keep-alive del cold-start (ver keep-alive.yml) -
+# no habia ningun chequeo de codigo antes de mergear.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck + build (shared, backend, frontend)
+        run: npm run build

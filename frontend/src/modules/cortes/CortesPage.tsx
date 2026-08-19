@@ -35,10 +35,9 @@ export function CortesPage() {
   }, []);
 
   async function handleCreate(values: CorteFormValues) {
-    const corte = await crearCorteRequest(values);
+    await crearCorteRequest(values);
     setShowForm(false);
     await loadCortes();
-    if (corte.treasuryWarning) alert(corte.treasuryWarning);
   }
 
   async function handleDelete(id: string) {

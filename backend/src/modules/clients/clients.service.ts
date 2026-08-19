@@ -1,10 +1,18 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
+import { paginationSkipTake, toPaginated, type PaginationQuery } from '../../utils/pagination.js';
 import type { CreateClientInput, UpdateClientInput } from './clients.schema.js';
 
-export function listClients() {
-  return prisma.client.findMany({ orderBy: { createdAt: 'desc' } });
+export async function listClients(query: PaginationQuery) {
+  const [items, total] = await Promise.all([
+    prisma.client.findMany({
+      orderBy: { createdAt: 'desc' },
+      ...paginationSkipTake(query),
+    }),
+    prisma.client.count(),
+  ]);
+  return toPaginated(items, total, query);
 }
 
 export async function getClient(id: string) {

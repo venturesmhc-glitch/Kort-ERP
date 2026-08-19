@@ -1,8 +1,13 @@
 import { apiRequest } from '../../lib/apiClient';
 import type { Client, ClientInput } from './clients.types';
 
-export function listClientsRequest() {
-  return apiRequest<Client[]>('/clients');
+// El backend pagina (ver backend/src/utils/pagination.ts), pero los 3
+// consumidores de esta funcion (ClientsPage, y los selectores de cliente de
+// CorteForm/VentaForm) todavia esperan "la lista completa" - se desenvuelve
+// items aca para no tener que tocarlos a todos.
+export async function listClientsRequest(): Promise<Client[]> {
+  const { items } = await apiRequest<{ items: Client[] }>('/clients');
+  return items;
 }
 
 export function createClientRequest(input: ClientInput) {

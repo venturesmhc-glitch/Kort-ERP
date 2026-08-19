@@ -49,10 +49,8 @@ export function deleteCorteRequest(id: string): Promise<void> {
   return apiRequest<void>(`/cuts/${id}`, { method: 'DELETE' });
 }
 
-export async function crearCorteRequest(
-  input: CorteFormValues
-): Promise<Corte & { treasuryWarning?: string }> {
-  const dto = await apiRequest<CutDto & { treasuryWarning?: string }>('/cuts', {
+export async function crearCorteRequest(input: CorteFormValues): Promise<Corte> {
+  const dto = await apiRequest<CutDto>('/cuts', {
     method: 'POST',
     body: {
       firstName: input.clienteNombre,
@@ -66,5 +64,5 @@ export async function crearCorteRequest(
       cutAt: input.fecha,
     },
   });
-  return { ...toCorte(dto), treasuryWarning: dto.treasuryWarning };
+  return toCorte(dto);
 }

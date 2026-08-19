@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { paginationQuerySchema } from '../../utils/pagination.js';
+
+export const listClientsQuerySchema = paginationQuerySchema;
 
 export const createClientSchema = z.object({
   firstName: z.string().min(1, 'El nombre es requerido'),

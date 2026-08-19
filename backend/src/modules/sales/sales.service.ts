@@ -6,6 +6,7 @@ import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { StockService } from '../articles/stock.service.js';
 import { TreasuryService } from '../treasury/treasury.service.js';
 import { calculateDiscountAmount, incrementUsesCount, resolveEligibleDiscount } from '../discounts/discounts.service.js';
+import { paginationSkipTake, toPaginated } from '../../utils/pagination.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import type { CreateSaleInput, ListSalesQuery } from './sales.schema.js';
 
@@ -105,25 +106,33 @@ export async function createSale(input: CreateSaleInput, user: AuthUser) {
       await incrementUsesCount(tx, discount.id, discount.maxUses);
     }
 
+    await TreasuryService.recordIncomeFromSale(tx, created);
+
     return created;
   });
 
-  const treasuryWarning = await TreasuryService.recordIncomeFromSale(sale);
-
-  return treasuryWarning ? { ...sale, treasuryWarning } : sale;
+  return sale;
 }
 
-export function listSales(filters: ListSalesQuery) {
-  return prisma.sale.findMany({
-    where: {
-      sellerId: filters.sellerId,
-      items: filters.articleId ? { some: { articleId: filters.articleId } } : undefined,
-      createdAt: {
-        gte: filters.dateFrom ? new Date(`${filters.dateFrom}T00:00:00`) : undefined,
-        lte: filters.dateTo ? new Date(`${filters.dateTo}T23:59:59.999`) : undefined,
-      },
+export async function listSales(filters: ListSalesQuery) {
+  const where: Prisma.SaleWhereInput = {
+    sellerId: filters.sellerId,
+    items: filters.articleId ? { some: { articleId: filters.articleId } } : undefined,
+    createdAt: {
+      gte: filters.dateFrom ? new Date(`${filters.dateFrom}T00:00:00`) : undefined,
+      lte: filters.dateTo ? new Date(`${filters.dateTo}T23:59:59.999`) : undefined,
     },
-    include: SALE_INCLUDE,
-    orderBy: { createdAt: 'desc' },
-  });
+  };
+
+  const [items, total] = await Promise.all([
+    prisma.sale.findMany({
+      where,
+      include: SALE_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+      ...paginationSkipTake(filters),
+    }),
+    prisma.sale.count({ where }),
+  ]);
+
+  return toPaginated(items, total, filters);
 }

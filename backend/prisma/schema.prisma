@@ -119,9 +119,48 @@ model Appointment {
 
   cut Cut?
   merchSale Sale?
+  scheduledNotifications ScheduledNotification[]
 
   @@unique([barberoId, scheduledAt])
+  @@index([clientId])
+  @@index([tipoCorteId])
+  @@index([discountId])
   @@map("appointments")
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum ScheduledNotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+// Recordatorio de turno (WhatsApp, 6hs antes) programado por
+// appointments.service.ts al crear/reprogramar un turno. Se persiste en vez
+// de usar setTimeout en memoria porque el proceso puede reiniciarse (Render
+// free duerme el servicio, ver keep-alive.yml) - un cron corto (ver
+// notifications/scheduler.service.ts) barre los pendientes vencidos cada
+// pocos minutos. La confirmacion por mail es sincrona (se envia al crear el
+// turno) y no pasa por esta tabla.
+model ScheduledNotification {
+  id            String                       @id @default(uuid())
+  appointmentId String
+  appointment   Appointment                  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  channel       NotificationChannel
+  sendAt        DateTime
+  status        ScheduledNotificationStatus  @default(PENDING)
+  attempts      Int                          @default(0)
+  lastError     String?
+  sentAt        DateTime?
+  createdAt     DateTime                     @default(now())
+
+  @@index([status, sendAt])
+  @@map("scheduled_notifications")
 }
 
 // Modulo Registro de cortes. El precio es un snapshot copiado de
@@ -150,6 +189,10 @@ model Cut {
   treasuryEntry TreasuryEntry?
 
   @@index([cutAt])
+  @@index([clientId])
+  @@index([barberoId])
+  @@index([tipoCorteId])
+  @@index([discountId])
   @@map("cuts")
 }
 
@@ -235,6 +278,7 @@ model StockMovement {
   reason    String?
   createdAt DateTime          @default(now())
 
+  @@index([articleId])
   @@map("stock_movements")
 }
 
@@ -285,6 +329,9 @@ model Sale {
   treasuryEntry TreasuryEntry?
 
   @@index([createdAt])
+  @@index([clientId])
+  @@index([sellerId])
+  @@index([discountId])
   @@map("sales")
 }
 
@@ -298,6 +345,7 @@ model SaleItem {
   unitPrice Int
   subtotal  Int
 
+  @@index([articleId])
   @@map("sale_items")
 }
 
@@ -364,6 +412,7 @@ model TreasuryEntry {
   createdByUserId String?
   createdAt       DateTime             @default(now())
 
+  @@index([categoryId])
   @@map("treasury_entries")
 }
 

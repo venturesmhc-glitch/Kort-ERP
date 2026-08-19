@@ -67,14 +67,15 @@ export async function listVentasRequest(filtros: ListVentasFiltros = {}): Promis
   if (filtros.fechaHasta) params.set('dateTo', filtros.fechaHasta);
   if (filtros.articuloId) params.set('articleId', filtros.articuloId);
   const query = params.toString();
-  const dtos = await apiRequest<SaleDto[]>(`/sales${query ? `?${query}` : ''}`);
+  // El backend pagina (ver backend/src/utils/pagination.ts), pero esta
+  // pantalla todavia consume "la lista completa" - se desenvuelve items
+  // aca para no tener que tocar cada consumidor (VentasPage, useTodaySummary).
+  const { items: dtos } = await apiRequest<{ items: SaleDto[] }>(`/sales${query ? `?${query}` : ''}`);
   return dtos.map(toVenta);
 }
 
-export async function crearVentaRequest(
-  input: CrearVentaInput
-): Promise<Venta & { treasuryWarning?: string }> {
-  const dto = await apiRequest<SaleDto & { treasuryWarning?: string }>('/sales', {
+export async function crearVentaRequest(input: CrearVentaInput): Promise<Venta> {
+  const dto = await apiRequest<SaleDto>('/sales', {
     method: 'POST',
     body: {
       items: input.items.map((item) => ({
@@ -87,5 +88,5 @@ export async function crearVentaRequest(
       discountCode: input.discountCode,
     },
   });
-  return { ...toVenta(dto), treasuryWarning: dto.treasuryWarning };
+  return toVenta(dto);
 }

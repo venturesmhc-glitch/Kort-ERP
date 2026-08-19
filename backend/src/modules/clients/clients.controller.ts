@@ -1,9 +1,10 @@
 import type { Request, Response } from 'express';
-import { createClientSchema, updateClientSchema } from './clients.schema.js';
+import { createClientSchema, listClientsQuerySchema, updateClientSchema } from './clients.schema.js';
 import * as clientsService from './clients.service.js';
 
-export async function listClientsHandler(_req: Request, res: Response) {
-  const clients = await clientsService.listClients();
+export async function listClientsHandler(req: Request, res: Response) {
+  const query = listClientsQuerySchema.parse(req.query);
+  const clients = await clientsService.listClients(query);
   res.json(clients);
 }
 

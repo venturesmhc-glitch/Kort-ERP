@@ -30,6 +30,18 @@ import {
 import { notificationsRouter } from './modules/notifications/notifications.routes.js';
 import { discountsRouter, publicDiscountsRouter } from './modules/discounts/discounts.routes.js';
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, (char) => (char === '*' ? char : `\\${char}`));
+}
+
+function matchesCorsOrigin(pattern: string, origin: string): boolean {
+  if (!pattern.includes('*')) {
+    return pattern === origin;
+  }
+  const regex = new RegExp(`^${escapeRegExp(pattern).replace(/\*/g, '[^.]*')}$`);
+  return regex.test(origin);
+}
+
 export const app = express();
 
 // crossOriginResourcePolicy en 'cross-origin': el frontend (otro origen) carga
@@ -40,7 +52,9 @@ app.use(
   cors({
     origin: (origin, callback) => {
       // Sin header Origin (curl, health checks) o origen en la whitelist: permitir.
-      if (!origin || env.corsOrigins.includes(origin)) {
+      // La whitelist admite '*' como comodin de un segmento (ej.
+      // "https://kort-erp-*.vercel.app" para previews de Vercel).
+      if (!origin || env.corsOrigins.some((pattern) => matchesCorsOrigin(pattern, origin))) {
         callback(null, true);
       } else {
         callback(new Error('No permitido por CORS'));

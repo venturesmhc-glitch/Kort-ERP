@@ -11,3 +11,15 @@ export const publicWriteLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: 'Demasiadas solicitudes, intenta de nuevo mas tarde' },
 });
+
+// Limiter especifico para login: ventana de 15 min / 10 intentos por IP.
+// Mas estricto que publicWriteLimiter porque protege contra fuerza bruta de
+// contraseñas, no solo abuso de escritura publica.
+export const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { message: 'Demasiados intentos de inicio de sesion, intenta de nuevo mas tarde' },
+});

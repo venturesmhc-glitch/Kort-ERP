@@ -43,14 +43,12 @@ export async function listMerchPendientesRequest(): Promise<MerchPedido[]> {
   return dtos.map(toMerchPedido);
 }
 
-export async function marcarMerchEntregadoRequest(
-  id: string
-): Promise<MerchPedido & { treasuryWarning?: string }> {
-  const dto = await apiRequest<MerchSaleDto & { treasuryWarning?: string }>(`/merch/${id}/status`, {
+export async function marcarMerchEntregadoRequest(id: string): Promise<MerchPedido> {
+  const dto = await apiRequest<MerchSaleDto>(`/merch/${id}/status`, {
     method: 'PUT',
     body: { status: 'DELIVERED' },
   });
-  return { ...toMerchPedido(dto), treasuryWarning: dto.treasuryWarning };
+  return toMerchPedido(dto);
 }
 
 export function cancelarMerchPedidoRequest(id: string): Promise<MerchPedido> {

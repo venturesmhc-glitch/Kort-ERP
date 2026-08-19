@@ -103,12 +103,12 @@ export async function createCut(input: CreateCutInput, user: AuthUser) {
         });
       }
 
+      await TreasuryService.recordIncomeFromCut(tx, created);
+
       return created;
     });
 
-    const treasuryWarning = await TreasuryService.recordIncomeFromCut(cut);
-
-    return treasuryWarning ? { ...cut, treasuryWarning } : cut;
+    return cut;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       throw new ConflictError('Ese turno ya tiene un corte registrado');
