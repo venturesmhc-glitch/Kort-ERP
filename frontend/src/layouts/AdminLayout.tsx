@@ -44,7 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/admin', label: 'Inicio', roles: ['DEV', 'ENCARGADO', 'BARBERO'], icon: IconHome, end: true },
   { to: '/admin/turnos', label: 'Agenda y horarios', roles: ['DEV', 'ENCARGADO', 'BARBERO'], icon: IconCalendar },
   { to: '/admin/clientes', label: 'Clientes', roles: ['DEV', 'ENCARGADO', 'BARBERO'], icon: IconClients },
-  { to: '/admin/cortes', label: 'Servicios registrados', roles: ['DEV', 'ENCARGADO', 'BARBERO'], icon: IconServices },
+  { to: '/admin/cortes', label: 'Cortes', roles: ['DEV', 'ENCARGADO', 'BARBERO'], icon: IconServices },
   {
     to: '/admin/articulos',
     label: 'Articulos y stock',
