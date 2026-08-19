@@ -93,6 +93,12 @@ const DATE_LABEL = new Intl.DateTimeFormat('es-AR', {
   month: 'long',
 }).format(new Date());
 
+const MOBILE_DATE_LABEL = new Intl.DateTimeFormat('es-AR', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+}).format(new Date());
+
 function initialsOf(firstName?: string, lastName?: string) {
   return `${firstName?.[0] ?? ''}${lastName?.[0] ?? ''}`.toUpperCase() || '?';
 }
@@ -211,6 +217,36 @@ export function AdminLayout() {
       </aside>
 
       <div className="admin-content">
+        <header className="mobile-header">
+          <NavLink to="/admin" end className="mobile-header-brand" aria-label="Ir al inicio">
+            {settings.logoUrl && !logoBroken ? (
+              <img
+                src={settings.logoUrl}
+                alt=""
+                className="mobile-header-logo-image"
+                onError={() => setLogoBroken(true)}
+              />
+            ) : (
+              <span className="mobile-header-logo-mark">K</span>
+            )}
+          </NavLink>
+          <div className="mobile-header-titles">
+            <h1 className="mobile-header-title">{pageTitleFor(location.pathname)}</h1>
+            <p className="mobile-header-subtitle">{MOBILE_DATE_LABEL}</p>
+          </div>
+          <div className="mobile-header-actions">
+            <NotificationBell notifications={notifications} unreadCount={unreadCount} onOpen={markAllRead} />
+            <button
+              type="button"
+              className="mobile-header-account"
+              onClick={() => setMoreOpen(true)}
+              aria-label="Cuenta y mas opciones"
+            >
+              {initialsOf(user?.firstName, user?.lastName)}
+            </button>
+          </div>
+        </header>
+
         {
           // La Agenda arma su propio encabezado (turnos de hoy, % de
           // ocupacion, accesos rapidos) que reemplaza a este generico.
@@ -253,17 +289,6 @@ export function AdminLayout() {
               </NavLink>
             ))}
           </div>
-          <div className="mobile-notification-slot">
-            <NotificationBell notifications={notifications} unreadCount={unreadCount} onOpen={markAllRead} />
-          </div>
-          <button
-            type="button"
-            className="mobile-more-trigger"
-            onClick={() => setMoreOpen(true)}
-            aria-label="Mas opciones"
-          >
-            {initialsOf(user?.firstName, user?.lastName)}
-          </button>
           <button type="button" className="mobile-fab" onClick={() => setFabOpen(true)} aria-label="Acciones rapidas">
             +
           </button>

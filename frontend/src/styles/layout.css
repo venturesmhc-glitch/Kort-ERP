@@ -402,35 +402,6 @@
   cursor: pointer;
 }
 
-.mobile-more-trigger {
-  width: 40px;
-  height: 40px;
-  flex: none;
-  border-radius: 99px;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-surface);
-  color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.mobile-notification-slot {
-  flex: none;
-}
-
-.mobile-notification-slot .notification-bell-trigger {
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border-radius: 99px;
-  justify-content: center;
-}
-
-.mobile-notification-slot .notification-panel {
-  right: -8px;
-}
-
 /* Action sheet (mobile "Mas" / acciones rapidas) ------------------------ */
 
 .sheet-overlay {
@@ -542,6 +513,10 @@
   border-top: 1px solid var(--color-border);
 }
 
+.mobile-header {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .admin-sidebar {
     display: none;
@@ -553,6 +528,100 @@
 
   .admin-main {
     padding: 20px 20px 100px;
+  }
+
+  .mobile-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background-color: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .mobile-header-brand {
+    flex: none;
+    display: flex;
+  }
+
+  .mobile-header-logo-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background-color: var(--color-accent);
+    color: var(--color-accent-contrast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .mobile-header-logo-image {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    object-fit: cover;
+  }
+
+  .mobile-header-titles {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-header-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-header-subtitle {
+    margin: 1px 0 0;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    text-transform: capitalize;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-header-actions {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-header-actions .notification-bell-trigger {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 99px;
+    justify-content: center;
+  }
+
+  .mobile-header-actions .notification-panel {
+    right: -8px;
+  }
+
+  .mobile-header-account {
+    width: 36px;
+    height: 36px;
+    flex: none;
+    border-radius: 99px;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    color: var(--color-primary);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
   }
 
   .mobile-tabbar {
@@ -593,6 +662,14 @@
     background-color: var(--color-primary);
     color: var(--color-primary-contrast);
     font-weight: 700;
+  }
+
+  /* El titulo de cada pagina ya lo muestra el mobile-header compartido
+     (logo + titulo + notificaciones + cuenta): evita mostrarlo 2 veces.
+     Subtitulos y acciones de .page-header se mantienen, son informacion
+     propia de cada pagina (fecha, contadores, botones de accion). */
+  .admin-main .page-header h1 {
+    display: none;
   }
 }
 

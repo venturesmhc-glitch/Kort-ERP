@@ -5,10 +5,14 @@ import { useBusinessSettings } from '../modules/business-settings/BusinessSettin
 // por encima de la paleta claro/oscuro base. Se llama solo en las paginas
 // publicas para no alterar la identidad visual del panel administrativo.
 export function useBusinessTheme() {
-  const { settings } = useBusinessSettings();
+  const { settings, loading } = useBusinessSettings();
   const { primary, secondary, accent } = settings.theme;
 
   useEffect(() => {
+    // Mientras no cargo la config real no aplicamos el tema placeholder:
+    // evita el "salto" de color por defecto -> color de marca real.
+    if (loading) return;
+
     const root = document.documentElement;
     if (primary) root.style.setProperty('--color-primary', primary);
     if (secondary) root.style.setProperty('--color-secondary', secondary);
@@ -19,5 +23,5 @@ export function useBusinessTheme() {
       root.style.removeProperty('--color-secondary');
       root.style.removeProperty('--color-accent');
     };
-  }, [primary, secondary, accent]);
+  }, [loading, primary, secondary, accent]);
 }

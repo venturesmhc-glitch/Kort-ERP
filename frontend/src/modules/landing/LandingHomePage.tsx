@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { useBusinessSettings } from '../business-settings/BusinessSettingsContext';
+import { Skeleton } from '../../components/AsyncState';
 import { IconBell, IconCalendar, IconStock } from '../../components/icons/NavIcons';
 
 export function LandingHomePage() {
-  const { settings } = useBusinessSettings();
+  const { settings, loading } = useBusinessSettings();
   const { address, hours } = settings.contact;
 
   return (
@@ -11,8 +12,16 @@ export function LandingHomePage() {
       <section className="landing-hero">
         <div className="landing-hero-copy">
           <span className="landing-eyebrow">Reserva online</span>
-          <h1>{settings.name}</h1>
-          {settings.tagline && <p>{settings.tagline}</p>}
+          {loading ? (
+            <Skeleton style={{ height: 40, width: '70%', marginBottom: 8 }} />
+          ) : (
+            <h1>{settings.name}</h1>
+          )}
+          {loading ? (
+            <Skeleton style={{ height: 20, width: '50%' }} />
+          ) : (
+            settings.tagline && <p>{settings.tagline}</p>
+          )}
           <div className="landing-hero-actions">
             <Link to="/turnos" className="button-primary landing-cta">
               Solicitar turno

@@ -59,7 +59,7 @@ export function TurnoWizardPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { settings } = useBusinessSettings();
+  const { settings, loading: settingsLoading } = useBusinessSettings();
 
   const [step, setStep] = useState(1);
   const [cliente, setCliente] = useState<ClienteStepFormValues>(EMPTY_CLIENTE);
@@ -300,10 +300,11 @@ export function TurnoWizardPage() {
     );
   }
 
-  if (initialLoading) {
+  if (initialLoading || settingsLoading) {
     return (
       <div className="wizard-shell">
         <div className="wizard-body">
+          <p className="text-muted">Cargando informacion del negocio...</p>
           <Skeleton style={{ height: 40, marginTop: 20, marginBottom: 16 }} />
           <Skeleton style={{ height: 60, marginBottom: 9 }} />
           <Skeleton style={{ height: 60, marginBottom: 9 }} />

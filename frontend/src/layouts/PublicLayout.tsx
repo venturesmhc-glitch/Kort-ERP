@@ -6,7 +6,7 @@ import { useBusinessTheme } from '../config/useBusinessTheme';
 
 export function PublicLayout() {
   useBusinessTheme();
-  const { settings } = useBusinessSettings();
+  const { settings, loading } = useBusinessSettings();
 
   const { name, logoUrl, headerImageUrl, footerImageUrl, badge, poweredBy } = settings;
   const year = new Date().getFullYear();
@@ -28,7 +28,9 @@ export function PublicLayout() {
         {headerImageUrl && <div className="public-header-overlay" aria-hidden="true" />}
         <div className="public-header-content">
           <NavLink to="/" end className="public-brand">
-            {logoUrl && !logoBroken ? (
+            {loading ? (
+              <span className="public-logo-skeleton skeleton" aria-hidden="true" />
+            ) : logoUrl && !logoBroken ? (
               <img
                 src={logoUrl}
                 alt={name}
@@ -38,7 +40,7 @@ export function PublicLayout() {
             ) : (
               <span className="public-logo">{name}</span>
             )}
-            {badge.enabled && badge.text && (
+            {!loading && badge.enabled && badge.text && (
               <span className="business-badge" style={{ backgroundColor: badge.color }}>
                 {badge.text}
               </span>
@@ -71,10 +73,14 @@ export function PublicLayout() {
             onError={() => setFooterImageBroken(true)}
           />
         )}
-        <p>
-          {name} — {year}
-        </p>
-        {poweredBy.enabled && poweredBy.text && (
+        {loading ? (
+          <span className="public-footer-skeleton skeleton" aria-hidden="true" />
+        ) : (
+          <p>
+            {name} — {year}
+          </p>
+        )}
+        {!loading && poweredBy.enabled && poweredBy.text && (
           <p className="public-footer-powered">{poweredBy.text}</p>
         )}
       </footer>

@@ -1,4 +1,5 @@
 import { useBusinessSettings } from '../business-settings/BusinessSettingsContext';
+import { PageSkeleton } from '../../components/AsyncState';
 
 function toWhatsappLink(whatsapp: string) {
   const digits = whatsapp.replace(/[^\d]/g, '');
@@ -36,10 +37,21 @@ function SocialIcon({ kind }: { kind: 'instagram' | 'facebook' | 'tiktok' }) {
 }
 
 export function ContactPage() {
-  const { settings } = useBusinessSettings();
+  const { settings, loading } = useBusinessSettings();
   const { name, contact } = settings;
   const { address, phone, whatsapp, email, hours, socials } = contact;
   const hasSocials = socials && (socials.instagram || socials.facebook || socials.tiktok);
+
+  if (loading) {
+    return (
+      <div className="contact-page">
+        <div className="page-header">
+          <h1>Contacto y ubicacion</h1>
+        </div>
+        <PageSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="contact-page">
