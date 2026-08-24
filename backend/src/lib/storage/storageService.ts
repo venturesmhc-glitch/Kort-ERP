@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { StorageClient } from '@supabase/storage-js';
+import sharp from 'sharp';
 import { env } from '../../config/env.js';
 
 export interface UploadableFile {
@@ -47,11 +48,41 @@ function extensionFor(mimeType: string): string {
   return EXTENSION_BY_MIME[mimeType] ?? '';
 }
 
+const MAX_IMAGE_WIDTH = 1600;
+
+// Las fotos que suben barberos/encargados desde el celular suelen pesar
+// varios MB a resoluciones muy por encima de lo que se muestra en pantalla
+// (tarjetas de producto, landing). Se redimensiona a un ancho maximo y se
+// recomprime antes de guardar, tanto en disco local como en Supabase
+// Storage, para no inflar el storage ni la carga de la tienda/landing. GIF
+// se deja intacto: podria ser animado, y reencodearlo sin flags extra de
+// sharp pierde la animacion.
+async function optimizeImage(file: UploadableFile): Promise<UploadableFile> {
+  if (file.mimeType === 'image/gif') {
+    return file;
+  }
+
+  let pipeline = sharp(file.buffer).resize({ width: MAX_IMAGE_WIDTH, withoutEnlargement: true });
+
+  if (file.mimeType === 'image/jpeg') {
+    pipeline = pipeline.jpeg({ quality: 80, mozjpeg: true });
+  } else if (file.mimeType === 'image/webp') {
+    pipeline = pipeline.webp({ quality: 80 });
+  } else if (file.mimeType === 'image/png') {
+    pipeline = pipeline.png({ compressionLevel: 9 });
+  }
+
+  const buffer = await pipeline.toBuffer();
+  return { ...file, buffer };
+}
+
 const UPLOAD_DIR = path.resolve(process.cwd(), 'uploads', 'articles');
 const LOCAL_URL_MARKER = '/uploads/articles/';
 
 class LocalDiskStorageService implements StorageService {
   async uploadImage(file: UploadableFile) {
+    file = await optimizeImage(file);
+
     if (!existsSync(UPLOAD_DIR)) {
       await mkdir(UPLOAD_DIR, { recursive: true });
     }
@@ -90,6 +121,8 @@ class SupabaseStorageService implements StorageService {
   private urlMarker = `/storage/v1/object/public/${env.supabaseStorageBucket}/`;
 
   async uploadImage(file: UploadableFile) {
+    file = await optimizeImage(file);
+
     const key = `${randomUUID()}${extensionFor(file.mimeType)}`;
     const { error } = await this.client.from(this.bucket).upload(key, file.buffer, {
       contentType: file.mimeType,
