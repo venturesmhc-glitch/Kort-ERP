@@ -93,7 +93,6 @@ export function CortesPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th></th>
                     <th>Fecha</th>
                     <th>Cliente</th>
                     <th>Barbero</th>
@@ -105,13 +104,6 @@ export function CortesPage() {
                 <tbody>
                   {cortes.map((corte) => (
                     <tr key={corte.id}>
-                      <td>
-                        {corte.imagenUrl ? (
-                          <img src={corte.imagenUrl} alt={corte.clienteNombre} className="row-thumb" />
-                        ) : (
-                          <span className="row-thumb row-thumb-empty">Sin img.</span>
-                        )}
-                      </td>
                       <td>{formatDate(corte.fecha)}</td>
                       <td>
                         {corte.clienteNombre} {corte.clienteApellido}
@@ -130,7 +122,7 @@ export function CortesPage() {
                   ))}
                   {cortes.length === 0 && (
                     <tr>
-                      <td colSpan={canDelete ? 7 : 6}>
+                      <td colSpan={canDelete ? 6 : 5}>
                         <EmptyState message="No hay cortes registrados todavia." />
                       </td>
                     </tr>

@@ -363,21 +363,13 @@ export async function validateDiscount(input: ValidateDiscountInput): Promise<Va
       }))
     : undefined;
 
-  if ((input.items && input.items.length > 0) || saleItems) {
-    if (discount.scope === 'MERCH' || discount.scope === 'BOTH') {
-      const priced = saleItems ?? (await priceMerchItems(input.items!));
-      const cartTotal = merchSale ? merchSale.totalAmount : priced.reduce((sum, item) => sum + item.subtotal, 0);
-      if (discount.minOrderAmount !== null && cartTotal < discount.minOrderAmount) {
-        reason = reason ?? 'No se alcanzo el monto minimo de compra para este cupon';
-      } else {
-        const discountAmount = calculateDiscountAmount(discount, priced, cartTotal);
-        merch = { subtotal: cartTotal, discountAmount, total: cartTotal - discountAmount };
-      }
-    } else {
-      reason = reason ?? 'Este cupon no aplica a productos';
-    }
-  }
-
+  // Corte se evalua antes que Merch a proposito: un cupon de MONTO FIJO con
+  // scope BOTH representa un unico descuento (ej. "-$3500"), no uno por cada
+  // categoria - si se calculara cada portion por separado (como hace
+  // PERCENTAGE, donde no hay problema porque cada % es proporcional a su
+  // propia base) el cliente terminaba viendo "-$3500 corte" y "-$3500 merch"
+  // a la vez, duplicando el descuento real. Al resolver Corte primero,
+  // Merch puede chequear si el monto fijo ya quedo consumido alli.
   if (input.corte) {
     if (discount.scope === 'CORTES' || discount.scope === 'BOTH') {
       const tipoCorte = await prisma.parameterItem.findUnique({ where: { id: input.corte.tipoCorteId } });
@@ -395,6 +387,26 @@ export async function validateDiscount(input: ValidateDiscountInput): Promise<Va
       }
     } else {
       reason = reason ?? 'Este cupon no aplica a turnos';
+    }
+  }
+
+  const isFixedType = discount.type === 'FIXED_AMOUNT' || discount.type === 'ITEM_FIXED_AMOUNT';
+  const fixedAmountConsumedByCorte = isFixedType && discount.scope === 'BOTH' && (corte?.discountAmount ?? 0) > 0;
+
+  if ((input.items && input.items.length > 0) || saleItems) {
+    if (discount.scope === 'MERCH' || discount.scope === 'BOTH') {
+      const priced = saleItems ?? (await priceMerchItems(input.items!));
+      const cartTotal = merchSale ? merchSale.totalAmount : priced.reduce((sum, item) => sum + item.subtotal, 0);
+      if (discount.minOrderAmount !== null && cartTotal < discount.minOrderAmount) {
+        reason = reason ?? 'No se alcanzo el monto minimo de compra para este cupon';
+      } else if (fixedAmountConsumedByCorte) {
+        merch = { subtotal: cartTotal, discountAmount: 0, total: cartTotal };
+      } else {
+        const discountAmount = calculateDiscountAmount(discount, priced, cartTotal);
+        merch = { subtotal: cartTotal, discountAmount, total: cartTotal - discountAmount };
+      }
+    } else {
+      reason = reason ?? 'Este cupon no aplica a productos';
     }
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { corteFormSchema, type CorteFormValues } from './cortes.schema';
 import { listBarberosRequest } from '../users/users.api';
 import type { AppUser } from '../users/users.types';
@@ -8,7 +8,6 @@ import { listClientsRequest } from '../clients/clients.api';
 import type { Client } from '../clients/clients.types';
 import { listTurnosRequest } from '../turnos/turnos.api';
 import type { Turno } from '../turnos/turnos.types';
-import { readFileAsDataUrl } from '../../lib/file';
 import { todayIso } from '../../lib/format';
 import { useToast } from '../../components/toast/ToastProvider';
 import { ApiError } from '../../lib/apiClient';
@@ -37,7 +36,6 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
     tipoCorteNombre: '',
     precio: 0,
     fecha: TODAY,
-    imagenUrl: '',
     appointmentId: '',
   });
   const [issues, setIssues] = useState<FieldIssue[] | undefined>(undefined);
@@ -108,13 +106,6 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
       tipoCorteId: turno.tipoCorteId,
       tipoCorteNombre: turno.tipoCorteNombre,
     }));
-  }
-
-  async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const dataUrl = await readFileAsDataUrl(file);
-    setValues((prev) => ({ ...prev, imagenUrl: dataUrl }));
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -261,12 +252,6 @@ export function CorteForm({ onSubmit, onCancel }: CorteFormProps) {
         onChange={(e) => setValues((prev) => ({ ...prev, fecha: e.target.value }))}
       />
       {getFieldError(issues, 'fecha') && <p className="form-error">{getFieldError(issues, 'fecha')}</p>}
-
-      <label htmlFor="imagen">Foto del corte (opcional)</label>
-      <input id="imagen" type="file" accept="image/*" onChange={handleImageChange} />
-      {values.imagenUrl && (
-        <img src={values.imagenUrl} alt={values.clienteNombre} className="image-upload-preview" />
-      )}
 
       <div className="client-form-actions">
         <button type="button" onClick={onCancel} disabled={saving}>

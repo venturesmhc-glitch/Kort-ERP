@@ -33,8 +33,18 @@ function generateCode(): string {
   return code;
 }
 
+// La barberia opera en horario de Argentina (UTC-3, sin horario de verano).
+// new Date(`${date}T${time}:00`) sin sufijo de zona horaria se interpreta en
+// la zona horaria LOCAL DEL PROCESO de Node, no en la del negocio - en dev
+// (Windows con reloj en Argentina) ambas coinciden por casualidad, pero en
+// produccion (Render/Docker corren en UTC) el turno terminaba guardado 3hs
+// antes de lo pedido (12:30 quedaba reservado a las 9:30). Fijar el offset
+// explicitamente hace que el resultado no dependa de en que zona horaria
+// corre el servidor.
+const BUSINESS_UTC_OFFSET = '-03:00';
+
 function combineDateTime(date: string, time: string): Date {
-  return new Date(`${date}T${time}:00`);
+  return new Date(`${date}T${time}:00${BUSINESS_UTC_OFFSET}`);
 }
 
 function toMinutes(time: string): number {
@@ -171,7 +181,7 @@ export function listWorkSchedules(barberoId?: string) {
 
 async function getBarbero(barberoId: string) {
   const barbero = await prisma.user.findUnique({ where: { id: barberoId } });
-  if (!barbero || barbero.role !== 'BARBERO' || !barbero.active) {
+  if (!barbero || !barbero.esBarbero || !barbero.active) {
     throw new NotFoundError('Barbero no encontrado');
   }
   return barbero;
@@ -341,7 +351,15 @@ async function applyDiscountCode(
       corte = true;
     }
 
-    if ((discount.scope === 'MERCH' || discount.scope === 'BOTH') && merchSaleId) {
+    // Un cupon de MONTO FIJO con scope BOTH es un unico descuento, no uno por
+    // categoria (ver discounts.service.ts validateDiscount, mismo criterio en
+    // el preview): si ya quedo reservado para el corte, no se resta tambien
+    // del pedido de merch - antes esto descontaba el monto completo dos
+    // veces (ej. -$3500 en el corte y otra vez -$3500 en merch).
+    const isFixedType = discount.type === 'FIXED_AMOUNT' || discount.type === 'ITEM_FIXED_AMOUNT';
+    const fixedAmountConsumedByCorte = isFixedType && discount.scope === 'BOTH' && corte;
+
+    if ((discount.scope === 'MERCH' || discount.scope === 'BOTH') && merchSaleId && !fixedAmountConsumedByCorte) {
       merch = await applyDiscountToMerchSale(discount, merchSaleId);
     }
 

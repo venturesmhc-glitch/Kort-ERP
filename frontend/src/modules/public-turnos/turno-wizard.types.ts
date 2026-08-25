@@ -13,6 +13,7 @@ export interface TurnoDraft {
   hora: string;
   tipoCorteId: string;
   tipoCorteNombre: string;
+  discountCode: string;
 }
 
 export const TURNO_DRAFT_KEY = 'kort-turno-draft';

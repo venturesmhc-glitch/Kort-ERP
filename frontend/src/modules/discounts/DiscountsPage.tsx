@@ -5,6 +5,7 @@ import { DISCOUNT_SCOPE_OPTIONS, DISCOUNT_TYPE_OPTIONS } from './discounts.schem
 import type { Discount } from './discounts.types';
 import type { DiscountFormValues } from './discounts.schema';
 import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
+import { StatusBadge, type StatusTone } from '../../components/StatusBadge';
 import { useToast } from '../../components/toast/ToastProvider';
 import { formatCurrency } from '../../lib/format';
 
@@ -19,6 +20,32 @@ function scopeLabel(scope: Discount['scope']) {
 function valueLabel(discount: Discount) {
   const isPercentage = discount.type === 'PERCENTAGE' || discount.type === 'ITEM_PERCENTAGE';
   return isPercentage ? `${discount.value}%` : formatCurrency(discount.value);
+}
+
+function usosRestantesLabel(discount: Discount) {
+  if (discount.maxUses === undefined) return 'Ilimitados';
+  return Math.max(discount.maxUses - discount.usesCount, 0).toString();
+}
+
+// El campo isActive solo refleja si el cupon fue desactivado a mano - la
+// tabla mostraba "Activo" igual para cupones ya vencidos o sin usos
+// disponibles (que el backend de todos modos rechaza al canjear, ver
+// discounts.service.ts resolveEligibleDiscount), lo que hacia parecer que el
+// sistema "no validaba" nada. Este estado combina las tres condiciones para
+// que el panel refleje si el codigo realmente sirve hoy.
+function resolveStatus(discount: Discount): { label: string; tone: StatusTone } {
+  if (!discount.isActive) return { label: 'Inactivo', tone: 'muted' };
+  const now = new Date();
+  if (discount.validFrom && new Date(discount.validFrom) > now) {
+    return { label: 'Programado', tone: 'muted' };
+  }
+  if (discount.validUntil && new Date(discount.validUntil) < now) {
+    return { label: 'Expirado', tone: 'danger' };
+  }
+  if (discount.maxUses !== undefined && discount.usesCount >= discount.maxUses) {
+    return { label: 'Agotado', tone: 'danger' };
+  }
+  return { label: 'Activo', tone: 'success' };
 }
 
 function toFormValues(discount: Discount): DiscountFormValues {
@@ -123,12 +150,15 @@ export function DiscountsPage() {
                 <th>Aplica a</th>
                 <th>Valor</th>
                 <th>Usos</th>
+                <th>Restantes</th>
                 <th>Estado</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {discounts.map((discount) => (
+              {discounts.map((discount) => {
+                const status = resolveStatus(discount);
+                return (
                 <tr key={discount.id}>
                   <td>{discount.code}</td>
                   <td>{discount.name}</td>
@@ -139,7 +169,10 @@ export function DiscountsPage() {
                     {discount.usesCount}
                     {discount.maxUses ? ` / ${discount.maxUses}` : ''}
                   </td>
-                  <td>{discount.isActive ? 'Activo' : 'Inactivo'}</td>
+                  <td>{usosRestantesLabel(discount)}</td>
+                  <td>
+                    <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+                  </td>
                   <td className="data-table-actions">
                     <button type="button" onClick={() => setEditingDiscount(discount)}>
                       Editar
@@ -149,10 +182,11 @@ export function DiscountsPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {discounts.length === 0 && (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <EmptyState message="No hay cupones cargados todavia." />
                   </td>
                 </tr>

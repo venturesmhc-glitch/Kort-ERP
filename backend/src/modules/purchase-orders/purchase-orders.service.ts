@@ -118,7 +118,18 @@ export async function deleteOrder(id: string) {
 // venta/ajuste que los disparo (ver stock.service.ts).
 export async function syncDraftForArticle(articleId: string, tx: Db) {
   const article = await tx.article.findUnique({ where: { id: articleId } });
-  if (!article || article.stockMinimo === null || article.stock > article.stockMinimo) {
+  if (!article) {
+    return;
+  }
+  // El umbral de reposicion es stockMinimo; si el articulo solo tiene
+  // stockCritico configurado (sin stockMinimo), se usa ese como umbral en su
+  // lugar - antes, dejar stockMinimo vacio hacia que el articulo nunca
+  // generara borrador de compra aunque hubiera cruzado stockCritico (ver
+  // schema.prisma: "bajo critico = alerta roja y dispara borrador de
+  // compra", mismo criterio usado en articles.service.ts/reports.service.ts
+  // para las alertas, que si consultan stockCritico de forma independiente).
+  const threshold = article.stockMinimo ?? article.stockCritico;
+  if (threshold === null || article.stock > threshold) {
     return;
   }
 
@@ -140,7 +151,7 @@ export async function syncDraftForArticle(articleId: string, tx: Db) {
     order = await tx.ordenCompra.create({ data: { proveedorId: supplierLink.proveedorId } });
   }
 
-  const cantidad = Math.max(article.stockMinimo - article.stock, 1);
+  const cantidad = Math.max(threshold - article.stock, 1);
   await tx.ordenCompraItem.upsert({
     where: { ordenId_articleId: { ordenId: order.id, articleId } },
     create: { ordenId: order.id, articleId, cantidad, precioUnitario: supplierLink.precioCosto },

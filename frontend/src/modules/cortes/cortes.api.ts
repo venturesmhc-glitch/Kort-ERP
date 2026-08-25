@@ -5,7 +5,6 @@ import type { CorteFormValues } from './cortes.schema';
 interface CutDto {
   id: string;
   price: number;
-  photoUrl: string | null;
   cutAt: string;
   appointmentId: string | null;
   client: { firstName: string; lastName: string; phone: string };
@@ -35,7 +34,6 @@ function toCorte(dto: CutDto): Corte {
     tipoCorteNombre: dto.tipoCorte.name,
     precio: dto.price,
     fecha: toLocalDate(dto.cutAt),
-    imagenUrl: dto.photoUrl ?? undefined,
     appointmentId: dto.appointmentId ?? undefined,
   };
 }
@@ -59,7 +57,6 @@ export async function crearCorteRequest(input: CorteFormValues): Promise<Corte> 
       barberoId: input.barberoId,
       tipoCorteId: input.tipoCorteId,
       price: input.precio,
-      photoUrl: input.imagenUrl || undefined,
       appointmentId: input.appointmentId || undefined,
       cutAt: input.fecha,
     },

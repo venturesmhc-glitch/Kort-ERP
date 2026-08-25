@@ -15,7 +15,7 @@ const CUT_INCLUDE = {
 
 export async function createCut(input: CreateCutInput, user: AuthUser) {
   const barbero = await prisma.user.findUnique({ where: { id: input.barberoId } });
-  if (!barbero || barbero.role !== 'BARBERO' || !barbero.active) {
+  if (!barbero || !barbero.esBarbero || !barbero.active) {
     throw new NotFoundError('Barbero no encontrado');
   }
   if (user.role === 'BARBERO' && user.id !== input.barberoId) {

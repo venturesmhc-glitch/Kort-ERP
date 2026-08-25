@@ -11,7 +11,7 @@ function parseRoleQuery(value: unknown): Role | undefined {
     : undefined;
 }
 
-function parseActiveQuery(value: unknown): boolean | undefined {
+function parseBooleanQuery(value: unknown): boolean | undefined {
   if (value === 'true') return true;
   if (value === 'false') return false;
   return undefined;
@@ -20,7 +20,8 @@ function parseActiveQuery(value: unknown): boolean | undefined {
 export async function listUsersHandler(req: Request, res: Response) {
   const users = await usersService.listUsers({
     role: parseRoleQuery(req.query.role),
-    active: parseActiveQuery(req.query.active),
+    active: parseBooleanQuery(req.query.active),
+    esBarbero: parseBooleanQuery(req.query.esBarbero),
   });
   res.json(users);
 }

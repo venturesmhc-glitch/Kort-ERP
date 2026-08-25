@@ -6,6 +6,7 @@ export interface AppUser {
   lastName: string;
   email: string;
   role: Role;
+  esBarbero?: boolean;
   dni?: string;
   phone?: string;
   address?: string;

@@ -19,6 +19,7 @@ const EMPTY_VALUES: UserFormValues = {
   lastName: '',
   email: '',
   role: 'BARBERO',
+  esBarbero: false,
   dni: '',
   phone: '',
   address: '',
@@ -124,6 +125,17 @@ export function UserForm({
         ))}
       </select>
       {getFieldError(issues, 'role') && <p className="form-error">{getFieldError(issues, 'role')}</p>}
+
+      {values.role !== 'BARBERO' && (
+        <div className="checkbox-field">
+          <Toggle
+            checked={values.esBarbero ?? false}
+            onChange={(esBarbero) => setValues((prev) => ({ ...prev, esBarbero }))}
+            label="Tambien atiende turnos (Barbero)"
+          />
+          <span>Tambien atiende turnos (Barbero)</span>
+        </div>
+      )}
 
       <label htmlFor="dni">DNI</label>
       <input

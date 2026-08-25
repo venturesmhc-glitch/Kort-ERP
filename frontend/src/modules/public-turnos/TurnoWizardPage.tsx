@@ -105,6 +105,7 @@ export function TurnoWizardPage() {
     setHora(draft.hora);
     setTipoCorteId(draft.tipoCorteId);
     setTipoCorteNombre(draft.tipoCorteNombre);
+    setDiscountCode(draft.discountCode ?? '');
     setStep(5);
   }, [searchParams]);
 
@@ -182,7 +183,7 @@ export function TurnoWizardPage() {
   }
 
   function currentDraft(): TurnoDraft {
-    return { cliente, barberoId, barberoNombre, fecha, hora, tipoCorteId, tipoCorteNombre };
+    return { cliente, barberoId, barberoNombre, fecha, hora, tipoCorteId, tipoCorteNombre, discountCode };
   }
 
   function handleVerMercancia() {
@@ -190,10 +191,13 @@ export function TurnoWizardPage() {
     navigate('/tienda?turno=1');
   }
 
-  async function handleAplicarCupon() {
+  // notifyIfInvalid=false para la revalidacion automatica (efecto de abajo):
+  // no tiene sentido mostrar un toast de error solo porque el carrito de
+  // merch cambio, eso es ruido - el toast solo aplica cuando el usuario
+  // mismo aprieta "Aplicar".
+  async function aplicarCupon(notifyIfInvalid: boolean) {
     if (!discountCode.trim()) return;
     setCheckingDiscount(true);
-    setDiscountPreview(null);
     try {
       const result = await validateDiscountRequest({
         code: discountCode.trim(),
@@ -201,15 +205,34 @@ export function TurnoWizardPage() {
         merchSaleId: pendingMerch?.saleId,
       });
       setDiscountPreview(result);
-      if (!result.valid) {
+      if (!result.valid && notifyIfInvalid) {
         toast.error(result.reason ?? 'Cupon invalido');
       }
     } catch (err) {
-      toast.error(toErrorMessage(err, 'No se pudo validar el cupon'));
+      if (notifyIfInvalid) {
+        toast.error(toErrorMessage(err, 'No se pudo validar el cupon'));
+      }
     } finally {
       setCheckingDiscount(false);
     }
   }
+
+  function handleAplicarCupon() {
+    setDiscountPreview(null);
+    void aplicarCupon(true);
+  }
+
+  // El cupon (si ya se habia aplicado) tiene que seguir vigente y
+  // recalcularse en tiempo real cuando el carrito de merch cambia (ej. el
+  // cliente entra a "Ver mercancia", agrega productos y vuelve al paso 5) -
+  // antes el codigo quedaba en memoria pero el preview con el descuento se
+  // perdia al recargar la pagina, y aunque no se perdiera, el subtotal de
+  // merch usado en el preview quedaba desactualizado.
+  useEffect(() => {
+    if (!discountCode.trim() || !tipoCorteId) return;
+    void aplicarCupon(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMerch?.saleId, pendingMerch?.total, tipoCorteId]);
 
   async function handleConfirmar() {
     setError(null);

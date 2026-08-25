@@ -30,8 +30,23 @@ export function DiscountForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel 
   const [values, setValues] = useState<DiscountFormValues>(initialValues);
   const [issues, setIssues] = useState<FieldIssue[] | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  const [slowSave, setSlowSave] = useState(false);
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [categorias, setCategorias] = useState<CatalogItem[]>([]);
+
+  // El botón se quedaba en "Guardando..." sin mas feedback durante el cold
+  // start del backend (Render free tier, hasta 50s la primera vez que
+  // recibe trafico luego de estar inactivo - ver apiClient.ts) y eso se
+  // percibia como que "guardar" no habia hecho nada. Este aviso solo
+  // aparece si de verdad se esta tardando.
+  useEffect(() => {
+    if (!saving) {
+      setSlowSave(false);
+      return;
+    }
+    const timer = setTimeout(() => setSlowSave(true), 4000);
+    return () => clearTimeout(timer);
+  }, [saving]);
 
   // Los pickers de items/categoria solo aplican a cupones de Merch (ver
   // discounts.service.ts assertDiscountBusinessRules en el backend, que
@@ -58,6 +73,12 @@ export function DiscountForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel 
 
     const parsed = discountFormSchema.safeParse(values);
     if (!parsed.success) {
+      // Antes esto solo guardaba los issues en estado: si el campo con error
+      // no tenia un getFieldError renderizado al lado (como pasaba con los 4
+      // campos numericos opcionales de abajo, ej. cargar "0" en "Usos
+      // maximos"), el click en Guardar no mostraba nada - ni toast, ni
+      // mensaje, ni request de red - y parecia que el boton no hacia nada.
+      toast.error('Revisa los campos marcados en rojo');
       setIssues(parsed.error.issues);
       return;
     }
@@ -150,6 +171,9 @@ export function DiscountForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel 
               }))
             }
           />
+          {getFieldError(issues, 'maxDiscountAmount') && (
+            <p className="form-error">{getFieldError(issues, 'maxDiscountAmount')}</p>
+          )}
         </>
       )}
 
@@ -162,6 +186,9 @@ export function DiscountForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel 
           setValues((prev) => ({ ...prev, minOrderAmount: e.target.value === '' ? undefined : Number(e.target.value) }))
         }
       />
+      {getFieldError(issues, 'minOrderAmount') && (
+        <p className="form-error">{getFieldError(issues, 'minOrderAmount')}</p>
+      )}
 
       <label htmlFor="maxUses">Usos maximos totales (opcional)</label>
       <input
@@ -170,6 +197,7 @@ export function DiscountForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel 
         value={values.maxUses ?? ''}
         onChange={(e) => setValues((prev) => ({ ...prev, maxUses: e.target.value === '' ? undefined : Number(e.target.value) }))}
       />
+      {getFieldError(issues, 'maxUses') && <p className="form-error">{getFieldError(issues, 'maxUses')}</p>}
 
       <label htmlFor="maxUsesPerUser">Usos maximos por cliente (opcional)</label>
       <input
@@ -180,6 +208,9 @@ export function DiscountForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel 
           setValues((prev) => ({ ...prev, maxUsesPerUser: e.target.value === '' ? undefined : Number(e.target.value) }))
         }
       />
+      {getFieldError(issues, 'maxUsesPerUser') && (
+        <p className="form-error">{getFieldError(issues, 'maxUsesPerUser')}</p>
+      )}
 
       <label htmlFor="validFrom">Vigente desde (opcional)</label>
       <input
@@ -249,6 +280,9 @@ export function DiscountForm({ initialValues = EMPTY_VALUES, onSubmit, onCancel 
           {saving ? 'Guardando...' : 'Guardar'}
         </button>
       </div>
+      {slowSave && (
+        <p className="text-muted">El servidor estaba inactivo y esta iniciando, puede tardar unos segundos...</p>
+      )}
     </form>
   );
 }

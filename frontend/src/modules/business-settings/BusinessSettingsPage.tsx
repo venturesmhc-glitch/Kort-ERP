@@ -18,9 +18,10 @@ interface ImageUploadFieldProps {
   currentUrl: string | undefined;
   uploading: boolean;
   onSelect: (file: File) => void;
+  onRemove: () => void;
 }
 
-function ImageUploadField({ label, currentUrl, uploading, onSelect }: ImageUploadFieldProps) {
+function ImageUploadField({ label, currentUrl, uploading, onSelect, onRemove }: ImageUploadFieldProps) {
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -31,7 +32,19 @@ function ImageUploadField({ label, currentUrl, uploading, onSelect }: ImageUploa
     <div className="image-upload-field">
       <label>{label}</label>
       {currentUrl ? (
-        <img src={currentUrl} alt={label} className="image-upload-preview" />
+        <div className="image-upload-preview-wrap">
+          <img src={currentUrl} alt={label} className="image-upload-preview" />
+          <button
+            type="button"
+            className="image-upload-remove"
+            onClick={onRemove}
+            disabled={uploading}
+            aria-label={`Quitar ${label}`}
+            title={`Quitar ${label}`}
+          >
+            ×
+          </button>
+        </div>
       ) : (
         <p className="text-muted">Sin imagen configurada.</p>
       )}
@@ -135,18 +148,21 @@ export function BusinessSettingsPage() {
           currentUrl={values.logoUrl}
           uploading={uploading.logo}
           onSelect={(file) => handleImageUpload('logo', file)}
+          onRemove={() => setValues((prev) => ({ ...prev, logoUrl: '' }))}
         />
         <ImageUploadField
           label="Imagen de portada (opcional)"
           currentUrl={values.headerImageUrl}
           uploading={uploading.header}
           onSelect={(file) => handleImageUpload('header', file)}
+          onRemove={() => setValues((prev) => ({ ...prev, headerImageUrl: '' }))}
         />
         <ImageUploadField
           label="Imagen de pie (opcional)"
           currentUrl={values.footerImageUrl}
           uploading={uploading.footer}
           onSelect={(file) => handleImageUpload('footer', file)}
+          onRemove={() => setValues((prev) => ({ ...prev, footerImageUrl: '' }))}
         />
 
         <details className="business-settings-url-fallback">

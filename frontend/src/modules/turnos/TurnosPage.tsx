@@ -74,10 +74,18 @@ export function TurnosPage() {
     loadAll();
   }, []);
 
+  // Antes esto llamaba a loadAll(), que vuelve a pedir turnos+horarios+
+  // configuracion y muestra otra vez el skeleton de carga completo - se
+  // sentia como si la pagina entera recargara por cada click en la Agenda.
+  // El endpoint ya devuelve el turno actualizado, asi que alcanza con
+  // reemplazarlo en el estado local; el resumen lateral (que si puede
+  // cambiar, ej. "Cobrado hoy" al completar un turno) se refresca en
+  // segundo plano sin tapar la pantalla.
   async function handleEstadoChange(id: string, estado: TurnoEstado) {
     try {
-      await updateTurnoEstadoRequest(id, estado);
-      await loadAll();
+      const updated = await updateTurnoEstadoRequest(id, estado);
+      setTurnos((prev) => [...prev.map((t) => (t.id === id ? updated : t))].sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora)));
+      summary.refresh();
     } catch (err) {
       toast.error(toErrorMessage(err, 'No se pudo actualizar el estado del turno.'));
     }

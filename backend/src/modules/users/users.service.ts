@@ -11,17 +11,26 @@ const LIST_SELECT = {
   lastName: true,
   email: true,
   role: true,
+  esBarbero: true,
   dni: true,
   phone: true,
   address: true,
   active: true,
 } as const;
 
-export function listUsers(filter: { role?: Role; active?: boolean }) {
+// role=BARBERO siempre puede atender turnos/cortes, sin importar lo que
+// mande el form; para el resto de los roles esBarbero es el toggle real
+// (ver UserForm.tsx: "Tambien atiende turnos").
+function resolveEsBarbero(role: Role, esBarbero: boolean | undefined): boolean {
+  return role === 'BARBERO' ? true : (esBarbero ?? false);
+}
+
+export function listUsers(filter: { role?: Role; active?: boolean; esBarbero?: boolean }) {
   return prisma.user.findMany({
     where: {
       ...(filter.role ? { role: filter.role } : {}),
       ...(filter.active !== undefined ? { active: filter.active } : {}),
+      ...(filter.esBarbero !== undefined ? { esBarbero: filter.esBarbero } : {}),
     },
     select: LIST_SELECT,
     orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
@@ -59,6 +68,7 @@ export async function createUser(input: CreateUserInput, actingUser: AuthUser) {
       email: input.email,
       password: hashedPassword,
       role: input.role,
+      esBarbero: resolveEsBarbero(input.role, input.esBarbero),
       dni: input.dni || undefined,
       phone: input.phone || undefined,
       address: input.address || undefined,
@@ -95,6 +105,7 @@ export async function updateUser(id: string, input: UpdateUserInput, actingUser:
       lastName: input.lastName,
       email: input.email,
       role: input.role,
+      esBarbero: resolveEsBarbero(input.role, input.esBarbero),
       dni: input.dni || null,
       phone: input.phone || null,
       address: input.address || null,
@@ -119,7 +130,7 @@ export async function deactivateUser(id: string) {
 
 export function listPublicBarberos() {
   return prisma.user.findMany({
-    where: { role: 'BARBERO', active: true },
+    where: { active: true, esBarbero: true },
     select: { id: true, firstName: true, lastName: true },
     orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
   });

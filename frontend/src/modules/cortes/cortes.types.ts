@@ -9,7 +9,6 @@ export interface Corte {
   tipoCorteNombre: string;
   precio: number;
   fecha: string;
-  imagenUrl?: string;
   appointmentId?: string;
 }
 

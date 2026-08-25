@@ -10,7 +10,6 @@ export const corteFormSchema = z.object({
   tipoCorteNombre: z.string().min(1),
   precio: z.coerce.number().positive('El precio debe ser mayor a 0'),
   fecha: z.string().min(1, 'La fecha es requerida'),
-  imagenUrl: z.string().optional(),
   appointmentId: z.string().optional(),
 });
 

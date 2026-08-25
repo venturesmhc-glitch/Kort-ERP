@@ -1366,6 +1366,40 @@ button[type='button'] {
   margin-bottom: 0.75rem;
 }
 
+.image-upload-preview-wrap {
+  position: relative;
+  width: 100px;
+  margin-bottom: 0.75rem;
+}
+
+.image-upload-preview-wrap .image-upload-preview {
+  margin-bottom: 0;
+}
+
+.image-upload-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  line-height: 1;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.image-upload-remove:hover {
+  background: var(--color-danger, #d64545);
+  color: #fff;
+}
+
 .image-upload-field {
   display: flex;
   flex-direction: column;

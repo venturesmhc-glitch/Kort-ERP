@@ -10,6 +10,10 @@ export const userBaseFields = {
   lastName: z.string().min(1, 'El apellido es requerido'),
   email: z.string().email('Ingresa un email valido'),
   role: z.enum(['DEV', 'ENCARGADO', 'BARBERO']),
+  // Solo relevante quando role !== 'BARBERO' (un Barbero siempre puede
+  // atender turnos); el backend fuerza esBarbero=true cuando role=BARBERO
+  // sin importar lo que mande el form (ver users.service.ts).
+  esBarbero: z.boolean().optional(),
   dni: z.string().optional(),
   phone: z.string().optional(),
   address: z.string().optional(),

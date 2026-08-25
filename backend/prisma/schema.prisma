@@ -37,6 +37,12 @@ model User {
   firstName String
   lastName  String
   role      Role
+  // Independiente del rol: un Encargado (o Dev) puede tambien atender turnos
+  // y cortes como si fuera Barbero. role=BARBERO siempre implica esBarbero=true
+  // (forzado en users.service.ts); para el resto de los roles es un toggle
+  // editable desde el formulario de Usuarios (ver skills.md: "al sacar el
+  // turno no dejaba elegir a un Encargado que tambien corta").
+  esBarbero Boolean  @default(false)
   dni       String?  @unique
   phone     String?
   address   String?

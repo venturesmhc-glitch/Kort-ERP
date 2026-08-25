@@ -80,6 +80,7 @@ export function UsersPage() {
             lastName: editingUser.lastName,
             email: editingUser.email,
             role: editingUser.role,
+            esBarbero: editingUser.esBarbero ?? false,
             dni: editingUser.dni ?? '',
             phone: editingUser.phone ?? '',
             address: editingUser.address ?? '',

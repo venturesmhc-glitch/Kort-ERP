@@ -17,9 +17,11 @@ export function deleteUserRequest(id: string): Promise<void> {
   return apiRequest<void>(`/users/${id}`, { method: 'DELETE' });
 }
 
-// Barberos activos para el panel admin (ej. HorarioForm).
+// Barberos activos para el panel admin (ej. HorarioForm) - incluye tanto a
+// los de rol Barbero como a Encargados/Dev marcados como "tambien atiende
+// turnos" (ver UserForm.tsx).
 export function listBarberosRequest(): Promise<AppUser[]> {
-  return apiRequest<AppUser[]>('/users?role=BARBERO&active=true');
+  return apiRequest<AppUser[]>('/users?esBarbero=true&active=true');
 }
 
 // Version publica (sin auth) para el wizard de turnos de la landing.
