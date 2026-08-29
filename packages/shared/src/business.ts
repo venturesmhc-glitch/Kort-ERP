@@ -19,6 +19,7 @@ export const businessContactSchema = z.object({
   whatsapp: z.string().optional(),
   email: z.string().email('Ingresa un email valido').optional().or(z.literal('')),
   hours: z.string().optional(),
+  taxId: z.string().optional(),
   socials: businessSocialsSchema.optional(),
 });
 

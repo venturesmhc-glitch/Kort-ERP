@@ -126,7 +126,7 @@ export function BusinessSettingsPage() {
       </div>
       <p className="text-muted">
         Nombre, contacto y colores de marca que se muestran en la landing publica (inicio, turnos,
-        tienda y contacto).
+        tienda y contacto) y en el encabezado de los reportes en PDF y Excel.
       </p>
 
       <form className="client-form business-settings-form" onSubmit={handleSubmit}>
@@ -231,6 +231,15 @@ export function BusinessSettingsPage() {
           value={values.contact.hours ?? ''}
           onChange={(e) => setValues((prev) => ({ ...prev, contact: { ...prev.contact, hours: e.target.value } }))}
         />
+
+        <label htmlFor="taxId">CUIT (opcional)</label>
+        <input
+          id="taxId"
+          value={values.contact.taxId ?? ''}
+          placeholder="30-12345678-9"
+          onChange={(e) => setValues((prev) => ({ ...prev, contact: { ...prev.contact, taxId: e.target.value } }))}
+        />
+        <p className="text-muted">Se muestra en el encabezado de los reportes en PDF y Excel.</p>
 
         <h2>Redes sociales</h2>
 

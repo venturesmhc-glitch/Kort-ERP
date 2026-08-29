@@ -101,6 +101,7 @@ function toConfig(row: BusinessSettingsRow): BusinessSettings {
       whatsapp: row.contactWhatsapp ?? '',
       email: row.contactEmail ?? '',
       hours: row.contactHours ?? '',
+      taxId: row.contactTaxId ?? '',
       socials: {
         instagram: row.socialInstagram ?? '',
         facebook: row.socialFacebook ?? '',
@@ -136,6 +137,7 @@ function fromConfig(input: BusinessSettings) {
     contactWhatsapp: input.contact.whatsapp || null,
     contactEmail: input.contact.email || null,
     contactHours: input.contact.hours || null,
+    contactTaxId: input.contact.taxId || null,
     socialInstagram: input.contact.socials?.instagram || null,
     socialFacebook: input.contact.socials?.facebook || null,
     socialTiktok: input.contact.socials?.tiktok || null,

@@ -534,6 +534,7 @@ model BusinessSettings {
   contactWhatsapp  String?
   contactEmail     String?
   contactHours     String?
+  contactTaxId     String?
   socialInstagram  String?
   socialFacebook   String?
   socialTiktok     String?
