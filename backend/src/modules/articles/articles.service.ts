@@ -80,19 +80,32 @@ export async function deleteArticle(id: string) {
 // despues los que solo cruzaron stockMinimo (amarillo), cada grupo por stock
 // ascendente. El nivel (bajo/critico) lo deriva el frontend comparando
 // stock contra stockMinimo/stockCritico (ver DashboardPage).
+//
+// El umbral es stockMinimo, o stockCritico si no hay stockMinimo cargado
+// (mismo criterio que PurchaseOrdersService.syncDraftForArticle y
+// reports.service.ts nivelStock): un articulo con solo stockCritico
+// configurado tiene que poder aparecer aca igual, si no el usuario nunca ve
+// la alerta ni la chance de cargarle un proveedor para que la orden de
+// compra automatica pueda armarse (antes el where excluia directamente
+// cualquier articulo sin stockMinimo, aunque ya hubiera cruzado su
+// stockCritico y hasta tuviera un borrador de orden de compra generado).
 export async function listLowStock() {
   const articles = await prisma.article.findMany({
-    where: { active: true, stockMinimo: { not: null } },
+    where: {
+      active: true,
+      OR: [{ stockMinimo: { not: null } }, { stockCritico: { not: null } }],
+    },
     include: ARTICLE_INCLUDE,
     orderBy: { stock: 'asc' },
   });
-  const bajoMinimo = articles.filter(
-    (article) => article.stockMinimo !== null && article.stock <= article.stockMinimo
-  );
-  const critico = bajoMinimo.filter(
+  const bajoUmbral = articles.filter((article) => {
+    const threshold = article.stockMinimo ?? article.stockCritico;
+    return threshold !== null && article.stock <= threshold;
+  });
+  const critico = bajoUmbral.filter(
     (article) => article.stockCritico !== null && article.stock <= article.stockCritico
   );
-  const soloBajo = bajoMinimo.filter((article) => !critico.includes(article));
+  const soloBajo = bajoUmbral.filter((article) => !critico.includes(article));
   return [...critico, ...soloBajo];
 }
 
