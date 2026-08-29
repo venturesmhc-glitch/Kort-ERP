@@ -770,6 +770,49 @@
   border-width: 0 0 1.5px;
 }
 
+.login-password-wrap {
+  position: relative;
+  display: flex;
+}
+
+.login-password-wrap input {
+  flex: 1;
+  padding-right: 28px;
+}
+
+.login-password-toggle {
+  position: absolute;
+  right: 0;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.login-password-toggle:hover {
+  color: var(--color-text);
+}
+
+/* Oculta los iconos nativos de "ver contrasena" del navegador (Edge/Chrome)
+   para que no se superpongan ni interfieran con nuestro boton propio. */
+.login-password-wrap input::-ms-reveal,
+.login-password-wrap input::-ms-clear {
+  display: none;
+}
+
+.login-password-wrap input::-webkit-credentials-auto-fill-button,
+.login-password-wrap input::-webkit-strong-password-auto-fill-button {
+  visibility: hidden;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+
 .login-remember {
   display: flex;
   align-items: center;
