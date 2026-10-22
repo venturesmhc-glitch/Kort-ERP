@@ -16,7 +16,8 @@
     "test": "vitest run",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "create-tenant": "tsx scripts/create-tenant.ts"
   },
   "dependencies": {
     "@kort/shared": "*",

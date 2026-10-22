@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, type Db } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import type {
@@ -42,6 +43,7 @@ export async function createEntry(input: CreateTreasuryEntryInput, user: AuthUse
 
   return prisma.treasuryEntry.create({
     data: {
+      tenantId: getTenantId(),
       type: input.type,
       expenseKind: input.type === 'EXPENSE' ? input.expenseKind : null,
       categoryId: input.categoryId,
@@ -186,7 +188,7 @@ export async function getSummary(query: TreasurySummaryQuery) {
   };
 }
 
-type TxClient = Prisma.TransactionClient;
+type TxClient = Db;
 
 async function recordIncome(
   tx: TxClient,
@@ -207,6 +209,7 @@ async function recordIncome(
 
   await tx.treasuryEntry.create({
     data: {
+      tenantId: getTenantId(),
       type: 'INCOME',
       categoryId: category.id,
       amount,

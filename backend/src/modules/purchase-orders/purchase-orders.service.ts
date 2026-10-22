@@ -1,10 +1,9 @@
 import { Prisma } from '@prisma/client';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, type Db } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { StockService } from '../articles/stock.service.js';
 import type { ListPurchaseOrdersQuery, UpdatePurchaseOrderInput } from './purchase-orders.schema.js';
-
-type Db = Prisma.TransactionClient | typeof prisma;
 
 const ORDER_INCLUDE = {
   proveedor: true,
@@ -41,6 +40,7 @@ export async function updateOrder(id: string, input: UpdatePurchaseOrderInput) {
   assertEditable(order);
 
   const total = input.items.reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
+  const tenantId = getTenantId();
 
   return prisma.$transaction(async (tx) => {
     await tx.ordenCompraItem.deleteMany({ where: { ordenId: id } });
@@ -49,7 +49,7 @@ export async function updateOrder(id: string, input: UpdatePurchaseOrderInput) {
       data: {
         proveedorId: input.proveedorId ?? order.proveedorId,
         total,
-        items: { create: input.items },
+        items: { create: input.items.map((item) => ({ ...item, tenantId })) },
       },
       include: ORDER_INCLUDE,
     });
@@ -144,17 +144,18 @@ export async function syncDraftForArticle(articleId: string, tx: Db) {
     return;
   }
 
+  const tenantId = getTenantId();
   let order = await tx.ordenCompra.findFirst({
     where: { proveedorId: supplierLink.proveedorId, estado: 'BORRADOR' },
   });
   if (!order) {
-    order = await tx.ordenCompra.create({ data: { proveedorId: supplierLink.proveedorId } });
+    order = await tx.ordenCompra.create({ data: { tenantId, proveedorId: supplierLink.proveedorId } });
   }
 
   const cantidad = Math.max(threshold - article.stock, 1);
   await tx.ordenCompraItem.upsert({
     where: { ordenId_articleId: { ordenId: order.id, articleId } },
-    create: { ordenId: order.id, articleId, cantidad, precioUnitario: supplierLink.precioCosto },
+    create: { tenantId, ordenId: order.id, articleId, cantidad, precioUnitario: supplierLink.precioCosto },
     update: { cantidad, precioUnitario: supplierLink.precioCosto },
   });
 

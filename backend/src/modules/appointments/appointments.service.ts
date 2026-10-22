@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { AppointmentStatus, DayOfWeek, Discount } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { createCutFromAppointment } from '../cuts/cuts.service.js';
@@ -150,10 +151,11 @@ export const NotificationService = {
 // --- Configuracion global (slotMinutes) ---
 
 async function getOrCreateSettings() {
+  const tenantId = getTenantId();
   return prisma.appointmentSettings.upsert({
-    where: { id: 1 },
+    where: { tenantId },
     update: {},
-    create: { id: 1 },
+    create: { tenantId },
   });
 }
 
@@ -162,10 +164,11 @@ export function getAppointmentSettings() {
 }
 
 export function updateAppointmentSettings(input: UpdateSettingsInput) {
+  const tenantId = getTenantId();
   return prisma.appointmentSettings.upsert({
-    where: { id: 1 },
+    where: { tenantId },
     update: { slotMinutes: input.slotMinutes },
-    create: { id: 1, slotMinutes: input.slotMinutes },
+    create: { tenantId, slotMinutes: input.slotMinutes },
   });
 }
 
@@ -191,7 +194,7 @@ export async function createWorkSchedule(input: CreateWorkScheduleInput) {
   await getBarbero(input.barberoId);
 
   try {
-    return await prisma.workSchedule.create({ data: input });
+    return await prisma.workSchedule.create({ data: { ...input, tenantId: getTenantId() } });
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       throw new ConflictError('Ya existe un horario cargado para ese barbero en ese dia');
@@ -412,6 +415,7 @@ export async function createAppointment(input: CreateAppointmentInput) {
     try {
       appointment = await prisma.appointment.create({
         data: {
+          tenantId: getTenantId(),
           code: generateCode(),
           clientId: client.id,
           barberoId: input.barberoId,

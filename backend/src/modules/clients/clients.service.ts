@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { paginationSkipTake, toPaginated, type PaginationQuery } from '../../utils/pagination.js';
 import type { CreateClientInput, UpdateClientInput } from './clients.schema.js';
@@ -24,19 +25,19 @@ export async function getClient(id: string) {
 }
 
 export async function createClient(input: CreateClientInput) {
-  const existing = await prisma.client.findUnique({ where: { phone: input.phone } });
+  const existing = await prisma.client.findFirst({ where: { phone: input.phone } });
   if (existing) {
     throw new ConflictError('Ya existe un cliente con ese telefono');
   }
 
-  return prisma.client.create({ data: input });
+  return prisma.client.create({ data: { ...input, tenantId: getTenantId() } });
 }
 
 export async function updateClient(id: string, input: UpdateClientInput) {
   await getClient(id);
 
   if (input.phone) {
-    const existing = await prisma.client.findUnique({ where: { phone: input.phone } });
+    const existing = await prisma.client.findFirst({ where: { phone: input.phone } });
     if (existing && existing.id !== id) {
       throw new ConflictError('Ya existe un cliente con ese telefono');
     }
@@ -64,10 +65,10 @@ export async function deleteClient(id: string) {
  * se reutiliza (usado por el flujo publico de reserva de turnos), si no se crea.
  */
 export async function findOrCreateClientByPhone(input: CreateClientInput) {
-  const existing = await prisma.client.findUnique({ where: { phone: input.phone } });
+  const existing = await prisma.client.findFirst({ where: { phone: input.phone } });
   if (existing) {
     return existing;
   }
 
-  return prisma.client.create({ data: input });
+  return prisma.client.create({ data: { ...input, tenantId: getTenantId() } });
 }

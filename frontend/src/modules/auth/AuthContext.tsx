@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { clearToken, setToken } from '../../lib/apiClient';
+import { useBusinessSettings } from '../business-settings/BusinessSettingsContext';
 import { loginRequest, logoutRequest } from './auth.api';
 import type { AuthUser } from './auth.types';
 
@@ -19,6 +20,7 @@ function loadStoredUser(): AuthUser | null {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(loadStoredUser);
+  const businessSettings = useBusinessSettings();
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -28,6 +30,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(result.token);
         localStorage.setItem(USER_KEY, JSON.stringify(result.user));
         setUser(result.user);
+        // Recien con el token puesto se puede resolver la marca del tenant
+        // (sin slug en la URL, ver BusinessSettingsContext.tsx) - sin esto,
+        // el panel admin quedaba con el placeholder hasta un refresh manual.
+        await businessSettings.refresh();
       },
       logout: async () => {
         // Best-effort: cierra la WorkSession en el backend (ver Jornadas
@@ -38,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
       },
     }),
-    [user]
+    [user, businessSettings]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

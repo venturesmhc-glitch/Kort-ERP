@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import type { Role, WorkSession } from '@prisma/client';
 import { UnauthorizedError } from '../../utils/errors.js';
 import type { WorkedHoursQuery } from './workshifts.schema.js';
@@ -39,7 +40,9 @@ function getEffectiveEnd(session: StaleCheckable, now: Date) {
 
 export function createSession(userId: string) {
   const now = new Date();
-  return prisma.workSession.create({ data: { userId, loginAt: now, lastActivityAt: now } });
+  return prisma.workSession.create({
+    data: { tenantId: getTenantId(), userId, loginAt: now, lastActivityAt: now },
+  });
 }
 
 // Se llama al loguear: si quedo una sesion abierta sin cerrar (el usuario

@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import type {
   CreateCategoryInput,
@@ -30,11 +31,11 @@ export async function getCategoryByKey(key: string) {
 }
 
 export async function createCategory(input: CreateCategoryInput) {
-  const existing = await prisma.parameterCategory.findUnique({ where: { key: input.key } });
+  const existing = await prisma.parameterCategory.findFirst({ where: { key: input.key } });
   if (existing) {
     throw new ConflictError('Ya existe un catalogo con esa clave');
   }
-  return prisma.parameterCategory.create({ data: input });
+  return prisma.parameterCategory.create({ data: { ...input, tenantId: getTenantId() } });
 }
 
 export async function updateCategory(key: string, input: UpdateCategoryInput) {
@@ -95,7 +96,7 @@ export async function createItem(key: string, input: CreateItemInput) {
   }
 
   return prisma.parameterItem.create({
-    data: { ...input, categoryId: category.id },
+    data: { ...input, categoryId: category.id, tenantId: getTenantId() },
   });
 }
 

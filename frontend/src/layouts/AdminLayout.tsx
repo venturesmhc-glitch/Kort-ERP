@@ -111,6 +111,9 @@ function pageTitleFor(pathname: string) {
 
 export function AdminLayout() {
   const { user, logout } = useAuth();
+  // "Ver sitio publico": el sitio de cada barberia vive bajo /t/:slug (ver
+  // router.tsx), a diferencia del panel admin que no lleva slug en la URL.
+  const publicSiteUrl = user ? `/t/${user.tenantSlug}` : '/';
   const { theme, toggleTheme } = useTheme();
   const { settings } = useBusinessSettings();
   const location = useLocation();
@@ -201,7 +204,7 @@ export function AdminLayout() {
 
           {accountOpen && (
             <div className="account-popover">
-              <NavLink to="/" className="account-popover-item">
+              <NavLink to={publicSiteUrl} className="account-popover-item">
                 <IconExternal /> Ver sitio publico
               </NavLink>
               <button type="button" className="account-popover-item" onClick={toggleTheme}>
@@ -257,7 +260,7 @@ export function AdminLayout() {
               </div>
               <div className="admin-header-actions">
                 <NotificationBell notifications={notifications} unreadCount={unreadCount} onOpen={markAllRead} />
-                <NavLink to="/" className="button-secondary">
+                <NavLink to={publicSiteUrl} className="button-secondary">
                   Ver sitio publico
                 </NavLink>
                 <button type="button" className="button-secondary" onClick={toggleTheme}>
@@ -352,7 +355,7 @@ export function AdminLayout() {
                 })}
               </div>
               <div className="sheet-footer">
-                <NavLink to="/" className="account-popover-item">
+                <NavLink to={publicSiteUrl} className="account-popover-item">
                   <IconExternal /> Ver sitio publico
                 </NavLink>
                 <button type="button" className="account-popover-item" onClick={toggleTheme}>

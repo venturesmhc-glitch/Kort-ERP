@@ -5,6 +5,7 @@ import path from 'node:path';
 import { StorageClient } from '@supabase/storage-js';
 import sharp from 'sharp';
 import { env } from '../../config/env.js';
+import { getTenantId } from '../tenantContext.js';
 
 export interface UploadableFile {
   buffer: Buffer;
@@ -83,11 +84,16 @@ class LocalDiskStorageService implements StorageService {
   async uploadImage(file: UploadableFile) {
     file = await optimizeImage(file);
 
-    if (!existsSync(UPLOAD_DIR)) {
-      await mkdir(UPLOAD_DIR, { recursive: true });
+    // Prefijo por tenant: no hace a la seguridad (las imagenes de articulos
+    // son publicas a proposito, se muestran en la landing/tienda de cada
+    // barberia), pero mantiene el storage organizado por cliente en vez de
+    // un unico directorio plano mezclando archivos de todas las barberias.
+    const tenantDir = path.join(UPLOAD_DIR, getTenantId());
+    if (!existsSync(tenantDir)) {
+      await mkdir(tenantDir, { recursive: true });
     }
 
-    const key = `${randomUUID()}${extensionFor(file.mimeType)}`;
+    const key = `${getTenantId()}/${randomUUID()}${extensionFor(file.mimeType)}`;
     await writeFile(path.join(UPLOAD_DIR, key), file.buffer);
 
     return { key, url: this.getImageUrl(key) };
@@ -123,7 +129,9 @@ class SupabaseStorageService implements StorageService {
   async uploadImage(file: UploadableFile) {
     file = await optimizeImage(file);
 
-    const key = `${randomUUID()}${extensionFor(file.mimeType)}`;
+    // Mismo criterio que LocalDiskStorageService: prefijo por tenant para
+    // mantener el bucket organizado, no por seguridad (bucket publico).
+    const key = `${getTenantId()}/${randomUUID()}${extensionFor(file.mimeType)}`;
     const { error } = await this.client.from(this.bucket).upload(key, file.buffer, {
       contentType: file.mimeType,
       upsert: false,

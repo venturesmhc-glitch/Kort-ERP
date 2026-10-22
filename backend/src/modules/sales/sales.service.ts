@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { Discount } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { AppError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { StockService } from '../articles/stock.service.js';
@@ -77,9 +78,11 @@ export async function createSale(input: CreateSaleInput, user: AuthUser) {
   // (Sale + SaleItem incluidos) - ver stock.service.ts para el soporte de tx.
   // El canal POS no tiene ciclo de vida (es COMPLETED de una), asi que el
   // cupon se redime (incrementUsesCount) ya mismo, en la misma transaccion.
+  const tenantId = getTenantId();
   const sale = await prisma.$transaction(async (tx) => {
     const created = await tx.sale.create({
       data: {
+        tenantId,
         channel: 'POS',
         clientId,
         sellerId: user.id,
@@ -88,6 +91,7 @@ export async function createSale(input: CreateSaleInput, user: AuthUser) {
         discountAmount: discount ? discountAmount : undefined,
         items: {
           create: itemsWithPrice.map((item) => ({
+            tenantId,
             articleId: item.articleId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,

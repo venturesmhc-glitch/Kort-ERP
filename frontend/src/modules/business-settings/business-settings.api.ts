@@ -3,10 +3,16 @@ import { apiRequest, apiUpload } from '../../lib/apiClient';
 
 export type BusinessImageField = 'logo' | 'header' | 'footer';
 
-// GET es publico (sin auth) porque la landing lo consume sin sesion; el
-// panel de administracion tambien lo usa para precargar el form de edicion.
-export function getBusinessSettingsRequest() {
+// Dos variantes segun quien pregunta (ver BusinessSettingsContext.tsx):
+// la landing/wizard publico (sin sesion) resuelve el tenant por el slug de
+// la URL via /public/business-settings; el panel admin (con sesion, sin
+// slug) usa la ruta autenticada, que resuelve el tenant por el JWT.
+export function getPublicBusinessSettingsRequest() {
   return apiRequest<BusinessSettings>('/public/business-settings', { auth: false });
+}
+
+export function getBusinessSettingsRequest() {
+  return apiRequest<BusinessSettings>('/business-settings');
 }
 
 export function updateBusinessSettingsRequest(input: BusinessSettings) {

@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { StockService } from '../articles/stock.service.js';
@@ -41,15 +42,18 @@ export async function createMerchOrder(input: CheckoutInput) {
   });
   const totalAmount = itemsWithPrice.reduce((sum, item) => sum + item.subtotal, 0);
 
+  const tenantId = getTenantId();
   return prisma.$transaction(async (tx) => {
     const sale = await tx.sale.create({
       data: {
+        tenantId,
         channel: 'MERCH',
         status: 'PENDING_PICKUP',
         clientId: client.id,
         totalAmount,
         items: {
           create: itemsWithPrice.map((item) => ({
+            tenantId,
             articleId: item.articleId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,

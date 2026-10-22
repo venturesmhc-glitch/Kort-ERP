@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { listPublicArticulosRequest } from '../articulos/articulos.api';
 import type { Articulo } from '../articulos/articulos.types';
 import { listPublicCatalogItemsRequest } from '../catalogs/catalogs.api';
@@ -16,6 +16,7 @@ const EMPTY_CLIENTE: MerchClienteInput = { nombre: '', apellido: '', telefono: '
 
 export function StorePage() {
   const toast = useToast();
+  const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const vieneDeTurno = searchParams.get('turno') === '1';
 
@@ -149,7 +150,7 @@ export function StorePage() {
       {vieneDeTurno && (
         <div className="card store-banner">
           <p>Ya elegiste barbero, horario y tipo de corte.</p>
-          <Link to="/turnos?resume=1" className="button-secondary">
+          <Link to={`/t/${slug}/turnos?resume=1`} className="button-secondary">
             Volver a completar tu turno
           </Link>
         </div>

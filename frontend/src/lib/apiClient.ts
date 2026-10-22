@@ -1,6 +1,34 @@
 const API_URL = import.meta.env.VITE_API_URL;
 const TOKEN_KEY = 'kort-token';
 
+// Multi-tenant: el wizard publico de turnos y la tienda viven bajo /t/:slug
+// (ver router.tsx, PublicTenantGate) y el backend resuelve el tenant por ese
+// slug en vez de por JWT (ver middleware/resolveTenantFromSlug.ts). Las
+// paginas publicas siguen llamando a rutas '/public/...' como antes (ver
+// turnos.api.ts, merch.api.ts, etc.) - resolvePublicPath() les antepone el
+// slug activo en un solo lugar, sin tocar cada caller. PublicTenantGate lo
+// setea de forma SINCRONICA durante el render (no en un efecto) para que ya
+// este listo para cualquier fetch que dispare un componente hijo.
+let publicTenantSlug: string | null = null;
+
+export function setPublicTenantSlug(slug: string | null) {
+  publicTenantSlug = slug;
+}
+
+export function getPublicTenantSlug() {
+  return publicTenantSlug;
+}
+
+function resolvePublicPath(path: string): string {
+  if (!path.startsWith('/public/')) {
+    return path;
+  }
+  if (!publicTenantSlug) {
+    throw new ApiError('No se pudo determinar la barberia (falta el slug en la URL)', 0);
+  }
+  return `/public/t/${publicTenantSlug}${path.slice('/public'.length)}`;
+}
+
 // El backend esta en Render plan free: si no tuvo trafico en ~15 min el
 // servicio "duerme" y la primera request tarda 30-50s en responder mientras
 // arranca de nuevo. 60s da margen a ese cold start sin dejar una request
@@ -80,7 +108,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
   }
 
-  const response = await fetchWithTimeout(`${API_URL}${path}`, {
+  const response = await fetchWithTimeout(`${API_URL}${resolvePublicPath(path)}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
@@ -108,7 +136,7 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetchWithTimeout(`${API_URL}${path}`, {
+  const response = await fetchWithTimeout(`${API_URL}${resolvePublicPath(path)}`, {
     method: 'POST',
     headers,
     body: formData,

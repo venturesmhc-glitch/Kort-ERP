@@ -1,6 +1,7 @@
 import type { BusinessSettings as BusinessSettingsRow, Role } from '@prisma/client';
 import type { BusinessSettings } from '@kort/shared';
 import { prisma } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { imageKeyFromUrl, storageService } from '../../lib/storage/storageService.js';
 import type { UploadableFile } from '../../lib/storage/storageService.js';
 
@@ -17,9 +18,10 @@ const IMAGE_COLUMN_BY_FIELD = {
 // evita depender de un seed: la primera lectura ya crea la fila con los
 // valores por defecto del schema.
 export async function getBusinessSettings(): Promise<BusinessSettings> {
+  const tenantId = getTenantId();
   const row = await prisma.businessSettings.upsert({
-    where: { id: 1 },
-    create: { id: 1 },
+    where: { tenantId },
+    create: { tenantId },
     update: {},
   });
   return toConfig(row);
@@ -36,16 +38,17 @@ export async function updateBusinessSettings(
   role: Role
 ): Promise<BusinessSettings> {
   const data = fromConfig(input);
+  const tenantId = getTenantId();
 
   if (role !== 'DEV') {
-    const current = await prisma.businessSettings.findUnique({ where: { id: 1 } });
+    const current = await prisma.businessSettings.findUnique({ where: { tenantId } });
     data.poweredByEnabled = current?.poweredByEnabled ?? data.poweredByEnabled;
     data.poweredByText = current?.poweredByText ?? data.poweredByText;
   }
 
   const row = await prisma.businessSettings.upsert({
-    where: { id: 1 },
-    create: { id: 1, ...data },
+    where: { tenantId },
+    create: { tenantId, ...data },
     update: data,
   });
   return toConfig(row);
@@ -60,9 +63,10 @@ export async function uploadBusinessImage(
   file: UploadableFile
 ): Promise<BusinessSettings> {
   const column = IMAGE_COLUMN_BY_FIELD[field];
+  const tenantId = getTenantId();
   const current = await prisma.businessSettings.upsert({
-    where: { id: 1 },
-    create: { id: 1 },
+    where: { tenantId },
+    create: { tenantId },
     update: {},
   });
   const previousUrl = current[column] as string | null;
@@ -70,7 +74,7 @@ export async function uploadBusinessImage(
 
   const { url } = await storageService.uploadImage(file);
   const updated = await prisma.businessSettings.update({
-    where: { id: 1 },
+    where: { tenantId },
     data: { [column]: url },
   });
 

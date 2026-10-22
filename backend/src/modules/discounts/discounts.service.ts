@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import type { Discount, DiscountScope, DiscountType, Prisma } from '@prisma/client';
-import { prisma } from '../../lib/prisma.js';
+import type { Discount, DiscountScope, DiscountType } from '@prisma/client';
+import { prisma, type Db } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { AppError, ConflictError, NotFoundError } from '../../utils/errors.js';
 import type { CreateDiscountInput, UpdateDiscountInput, ValidateDiscountInput } from './discounts.schema.js';
 
@@ -23,7 +24,7 @@ function randomCode(): string {
 async function generateUniqueCode(): Promise<string> {
   for (let attempt = 0; attempt < 10; attempt++) {
     const code = randomCode();
-    const existing = await prisma.discount.findUnique({ where: { code } });
+    const existing = await prisma.discount.findFirst({ where: { code } });
     if (!existing) {
       return code;
     }
@@ -105,7 +106,7 @@ export async function createDiscount(input: CreateDiscountInput) {
 
   const code = input.code ?? (await generateUniqueCode());
   if (input.code) {
-    const existing = await prisma.discount.findUnique({ where: { code } });
+    const existing = await prisma.discount.findFirst({ where: { code } });
     if (existing) {
       throw new ConflictError('Ya existe un cupon con ese codigo');
     }
@@ -113,6 +114,7 @@ export async function createDiscount(input: CreateDiscountInput) {
 
   return prisma.discount.create({
     data: {
+      tenantId: getTenantId(),
       code,
       name: input.name,
       type: input.type,
@@ -147,7 +149,7 @@ export async function updateDiscount(id: string, input: UpdateDiscountInput) {
 
   let code = input.code;
   if (code && code !== discount.code) {
-    const existing = await prisma.discount.findUnique({ where: { code } });
+    const existing = await prisma.discount.findFirst({ where: { code } });
     if (existing) {
       throw new ConflictError('Ya existe un cupon con ese codigo');
     }
@@ -303,7 +305,7 @@ export async function resolveEligibleDiscount(code: string, now: Date = new Date
 // cupon al mismo tiempo (si el guard no matchea, updateMany no toca nada en
 // vez de tirar error - la llamada queda como no-op, ver cada punto de uso).
 export async function incrementUsesCount(
-  tx: Prisma.TransactionClient,
+  tx: Db,
   discountId: string,
   maxUses: number | null
 ) {

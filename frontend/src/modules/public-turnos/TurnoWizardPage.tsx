@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { clienteStepSchema, type ClienteStepFormValues } from './turno-wizard.schema';
 import { loadTurnoDraft, saveTurnoDraft, clearTurnoDraft, type TurnoDraft } from './turno-wizard.types';
 import { listPublicBarberosRequest } from '../users/users.api';
@@ -57,6 +57,7 @@ export function TurnoWizardPage() {
   useBusinessTheme();
   const toast = useToast();
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const { settings, loading: settingsLoading } = useBusinessSettings();
 
@@ -188,7 +189,7 @@ export function TurnoWizardPage() {
 
   function handleVerMercancia() {
     saveTurnoDraft(currentDraft());
-    navigate('/tienda?turno=1');
+    navigate(`/t/${slug}/tienda?turno=1`);
   }
 
   // notifyIfInvalid=false para la revalidacion automatica (efecto de abajo):

@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { TreasuryService } from '../treasury/treasury.service.js';
@@ -83,6 +84,7 @@ export async function createCut(input: CreateCutInput, user: AuthUser) {
 
       const created = await tx.cut.create({
         data: {
+          tenantId: getTenantId(),
           clientId: client.id,
           barberoId: input.barberoId,
           tipoCorteId: input.tipoCorteId,
@@ -166,6 +168,7 @@ export async function createCutFromAppointment(appointmentId: string) {
 
       const created = await tx.cut.create({
         data: {
+          tenantId: getTenantId(),
           clientId: appointment.clientId,
           barberoId: appointment.barberoId,
           tipoCorteId: appointment.tipoCorteId,

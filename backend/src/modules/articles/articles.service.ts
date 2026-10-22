@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { NotFoundError } from '../../utils/errors.js';
 import { StockService } from './stock.service.js';
 import { imageKeyFromUrl, storageService } from '../../lib/storage/storageService.js';
@@ -38,6 +39,7 @@ export async function createArticle(input: CreateArticleInput) {
 
   const article = await prisma.article.create({
     data: {
+      tenantId: getTenantId(),
       name: input.name,
       description: input.description,
       tipoProductoId: input.tipoProductoId,

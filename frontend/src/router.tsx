@@ -2,6 +2,7 @@ import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { AdminLayout } from './layouts/AdminLayout';
 import { PublicLayout } from './layouts/PublicLayout';
+import { PublicTenantGate } from './layouts/PublicTenantGate';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './modules/auth/LoginPage';
 import { LazyRoute as Lazy } from './components/LazyRoute';
@@ -56,22 +57,31 @@ export const router = createBrowserRouter([
     path: '/admin/login',
     element: <LoginPage />,
   },
-  // El wizard vive fuera de PublicLayout: cada paso tiene su propia cabecera
-  // (ver design_handoff_kort_ui) y no debe mostrar la navegacion del sitio
-  // publico ni el link de login del equipo.
+  // Sitio publico de cada barberia, identificado por el slug del tenant en
+  // la URL (ver PublicTenantGate / middleware/resolveTenantFromSlug.ts del
+  // backend). El wizard vive fuera de PublicLayout: cada paso tiene su
+  // propia cabecera (ver design_handoff_kort_ui) y no debe mostrar la
+  // navegacion del sitio publico ni el link de login del equipo.
   {
-    path: '/turnos',
+    path: '/t/:slug/turnos',
     element: (
-      <Lazy>
-        <TurnoWizardPage />
-      </Lazy>
+      <PublicTenantGate>
+        <Lazy>
+          <TurnoWizardPage />
+        </Lazy>
+      </PublicTenantGate>
     ),
   },
   {
-    element: <PublicLayout />,
+    path: '/t/:slug',
+    element: (
+      <PublicTenantGate>
+        <PublicLayout />
+      </PublicTenantGate>
+    ),
     children: [
       {
-        path: '/',
+        index: true,
         element: (
           <Lazy>
             <LandingHomePage />
@@ -79,7 +89,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/tienda',
+        path: 'tienda',
         element: (
           <Lazy>
             <StorePage />
@@ -87,7 +97,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/contacto',
+        path: 'contacto',
         element: (
           <Lazy>
             <ContactPage />

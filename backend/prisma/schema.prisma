@@ -30,8 +30,51 @@ enum AppointmentStatus {
   COMPLETED
 }
 
+// Modulo Multi-tenant: una fila por barberia/negocio contratado. Es la raiz
+// de todo el resto del modelo - no es tenant-scoped (no tiene tenantId
+// propio). slug identifica al tenant en las rutas publicas del wizard de
+// turnos (ver app.ts /api/public/t/:tenantSlug) y active permite
+// suspender el acceso de un cliente sin borrar sus datos (ej. falta de
+// pago). Se crea con el script backend/scripts/create-tenant.ts, no hay
+// alta de self-signup todavia (ver skills.md y plan de comercializacion:
+// la venta es manual/alto-contacto para los primeros clientes).
+model Tenant {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users                User[]
+  clients              Client[]
+  workSchedules        WorkSchedule[]
+  appointmentSettings  AppointmentSettings[]
+  appointments         Appointment[]
+  cuts                 Cut[]
+  parameterCategories  ParameterCategory[]
+  parameterItems       ParameterItem[]
+  articles             Article[]
+  stockMovements       StockMovement[]
+  sales                Sale[]
+  saleItems            SaleItem[]
+  workSessions         WorkSession[]
+  treasuryEntries      TreasuryEntry[]
+  organizationSettings OrganizationSettings[]
+  proveedores          Proveedor[]
+  proveedorProductos   ProveedorProducto[]
+  ordenesCompra        OrdenCompra[]
+  ordenCompraItems     OrdenCompraItem[]
+  businessSettings     BusinessSettings[]
+  discounts            Discount[]
+
+  @@map("tenants")
+}
+
 model User {
   id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   email     String   @unique
   password  String
   firstName String
@@ -56,14 +99,17 @@ model User {
   sales         Sale[]
   workSessions  WorkSession[]
 
+  @@index([tenantId])
   @@map("users")
 }
 
 model Client {
   id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   firstName String
   lastName  String
-  phone     String   @unique
+  phone     String
   email     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -72,7 +118,9 @@ model Client {
   cuts         Cut[]
   sales        Sale[]
 
+  @@unique([tenantId, phone])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("clients")
 }
 
@@ -80,6 +128,8 @@ model Client {
 // (slotMinutes) es una configuracion global, ver AppointmentSettings.
 model WorkSchedule {
   id        String    @id @default(uuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   barberoId String
   barbero   User      @relation(fields: [barberoId], references: [id], onDelete: Cascade)
   dayOfWeek DayOfWeek
@@ -89,12 +139,16 @@ model WorkSchedule {
   updatedAt DateTime  @updatedAt
 
   @@unique([barberoId, dayOfWeek])
+  @@index([tenantId])
   @@map("work_schedules")
 }
 
-// Configuracion global del modulo Turnos. Fila unica (id fijo en 1).
+// Configuracion global del modulo Turnos. Una fila por tenant (tenantId es
+// la propia primary key) - antes era una fila unica global (id fijo en 1)
+// cuando cada barberia era un deploy propio.
 model AppointmentSettings {
-  id          Int      @id @default(1)
+  tenantId    String   @id
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   slotMinutes Int      @default(30)
   updatedAt   DateTime @updatedAt
 
@@ -103,7 +157,9 @@ model AppointmentSettings {
 
 model Appointment {
   id              String            @id @default(uuid())
-  code            String            @unique
+  tenantId        String
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code            String
   clientId        String
   client          Client            @relation(fields: [clientId], references: [id])
   barberoId       String
@@ -123,14 +179,16 @@ model Appointment {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  cut Cut?
-  merchSale Sale?
+  cut                    Cut?
+  merchSale              Sale?
   scheduledNotifications ScheduledNotification[]
 
+  @@unique([tenantId, code])
   @@unique([barberoId, scheduledAt])
   @@index([clientId])
   @@index([tipoCorteId])
   @@index([discountId])
+  @@index([tenantId])
   @@map("appointments")
 }
 
@@ -153,17 +211,22 @@ enum ScheduledNotificationStatus {
 // notifications/scheduler.service.ts) barre los pendientes vencidos cada
 // pocos minutos. La confirmacion por mail es sincrona (se envia al crear el
 // turno) y no pasa por esta tabla.
+//
+// No tiene tenantId propio: el scheduler barre TODOS los tenants en cada
+// corrida (es la unica query intencionalmente cross-tenant del sistema, ver
+// scheduler.service.ts) y resuelve el tenant de cada recordatorio via
+// appointment.tenantId cuando lo necesita (ej. personalizar la plantilla).
 model ScheduledNotification {
-  id            String                       @id @default(uuid())
+  id            String                      @id @default(uuid())
   appointmentId String
-  appointment   Appointment                  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointment   Appointment                 @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   channel       NotificationChannel
   sendAt        DateTime
-  status        ScheduledNotificationStatus  @default(PENDING)
-  attempts      Int                          @default(0)
+  status        ScheduledNotificationStatus @default(PENDING)
+  attempts      Int                         @default(0)
   lastError     String?
   sentAt        DateTime?
-  createdAt     DateTime                     @default(now())
+  createdAt     DateTime                    @default(now())
 
   @@index([status, sendAt])
   @@map("scheduled_notifications")
@@ -172,25 +235,27 @@ model ScheduledNotification {
 // Modulo Registro de cortes. El precio es un snapshot copiado de
 // ParameterItem.price al momento del corte, no una referencia (ver Cut.price).
 model Cut {
-  id            String        @id @default(uuid())
-  clientId      String
-  client        Client        @relation(fields: [clientId], references: [id])
-  barberoId     String
-  barbero       User          @relation(fields: [barberoId], references: [id])
-  tipoCorteId   String
-  tipoCorte     ParameterItem @relation(fields: [tipoCorteId], references: [id])
+  id             String        @id @default(uuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id])
+  barberoId      String
+  barbero        User          @relation(fields: [barberoId], references: [id])
+  tipoCorteId    String
+  tipoCorte      ParameterItem @relation(fields: [tipoCorteId], references: [id])
   // price ya es el precio final (con descuento aplicado si corresponde) - ver
   // cuts.service.ts createCut. discountId/discountAmount quedan solo como
   // traza para reportes, no se usan para recalcular nada.
-  price         Int
-  discountId      String?
-  discount        Discount?     @relation(fields: [discountId], references: [id])
-  discountAmount  Int?
-  photoUrl      String?
-  appointmentId String?       @unique
-  appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
-  cutAt         DateTime      @default(now())
-  createdAt     DateTime      @default(now())
+  price          Int
+  discountId     String?
+  discount       Discount?     @relation(fields: [discountId], references: [id])
+  discountAmount Int?
+  photoUrl       String?
+  appointmentId  String?       @unique
+  appointment    Appointment?  @relation(fields: [appointmentId], references: [id])
+  cutAt          DateTime      @default(now())
+  createdAt      DateTime      @default(now())
 
   treasuryEntry TreasuryEntry?
 
@@ -199,6 +264,7 @@ model Cut {
   @@index([barberoId])
   @@index([tipoCorteId])
   @@index([discountId])
+  @@index([tenantId])
   @@map("cuts")
 }
 
@@ -206,7 +272,9 @@ model Cut {
 // sumar catalogos nuevos sin migracion. Ver skills.md #5.11 y #8.
 model ParameterCategory {
   id          String          @id @default(uuid())
-  key         String          @unique
+  tenantId    String
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  key         String
   name        String
   description String?
   isSystem    Boolean         @default(false)
@@ -216,11 +284,15 @@ model ParameterCategory {
   updatedAt   DateTime        @updatedAt
   items       ParameterItem[]
 
+  @@unique([tenantId, key])
+  @@index([tenantId])
   @@map("parameter_categories")
 }
 
 model ParameterItem {
   id              String            @id @default(uuid())
+  tenantId        String
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   categoryId      String
   category        ParameterCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   name            String
@@ -240,6 +312,7 @@ model ParameterItem {
   treasuryEntries TreasuryEntry[]
 
   @@unique([categoryId, name])
+  @@index([tenantId])
   @@map("parameter_items")
 }
 
@@ -254,29 +327,34 @@ enum StockMovementType {
 // ver PurchaseOrdersService.syncDraftForArticle): bajo minimo = alerta
 // amarilla, bajo critico = alerta roja y dispara borrador de compra.
 model Article {
-  id              String              @id @default(uuid())
-  name            String
-  description     String?
-  tipoProductoId  String
-  tipoProducto    ParameterItem       @relation(fields: [tipoProductoId], references: [id])
-  price           Int
-  imageUrl        String?
-  stock           Int                 @default(0)
-  stockMinimo     Int?
-  stockCritico    Int?
-  active          Boolean             @default(true)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  movements       StockMovement[]
-  saleItems       SaleItem[]
-  proveedores     ProveedorProducto[]
-  ordenItems      OrdenCompraItem[]
+  id             String              @id @default(uuid())
+  tenantId       String
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  tipoProductoId String
+  tipoProducto   ParameterItem       @relation(fields: [tipoProductoId], references: [id])
+  price          Int
+  imageUrl       String?
+  stock          Int                 @default(0)
+  stockMinimo    Int?
+  stockCritico   Int?
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  movements      StockMovement[]
+  saleItems      SaleItem[]
+  proveedores    ProveedorProducto[]
+  ordenItems     OrdenCompraItem[]
 
+  @@index([tenantId])
   @@map("articles")
 }
 
 model StockMovement {
   id        String            @id @default(uuid())
+  tenantId  String
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   articleId String
   article   Article           @relation(fields: [articleId], references: [id], onDelete: Cascade)
   type      StockMovementType
@@ -285,6 +363,7 @@ model StockMovement {
   createdAt DateTime          @default(now())
 
   @@index([articleId])
+  @@index([tenantId])
   @@map("stock_movements")
 }
 
@@ -313,23 +392,25 @@ enum SaleStatus {
 // vinculo opcional con el turno cuando el pedido surge del flujo "ver
 // mercancia" del wizard publico (ver appointments.service.ts).
 model Sale {
-  id            String      @id @default(uuid())
-  channel       SaleChannel @default(POS)
-  status        SaleStatus  @default(COMPLETED)
-  clientId      String?
-  client        Client?     @relation(fields: [clientId], references: [id])
-  sellerId      String?
-  seller        User?       @relation(fields: [sellerId], references: [id])
-  appointmentId String?     @unique
-  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
-  totalAmount   Int
+  id             String       @id @default(uuid())
+  tenantId       String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel        SaleChannel  @default(POS)
+  status         SaleStatus   @default(COMPLETED)
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id])
+  sellerId       String?
+  seller         User?        @relation(fields: [sellerId], references: [id])
+  appointmentId  String?      @unique
+  appointment    Appointment? @relation(fields: [appointmentId], references: [id])
+  totalAmount    Int
   // totalAmount ya viene con el descuento restado (POS: al crear la venta;
   // Merch: al confirmar el turno vinculado, ver appointments.service.ts).
   // discountId/discountAmount quedan como traza, no se usan para recalcular.
   discountId     String?
-  discount       Discount?   @relation(fields: [discountId], references: [id])
+  discount       Discount?    @relation(fields: [discountId], references: [id])
   discountAmount Int?
-  createdAt     DateTime    @default(now())
+  createdAt      DateTime     @default(now())
 
   items         SaleItem[]
   treasuryEntry TreasuryEntry?
@@ -338,11 +419,14 @@ model Sale {
   @@index([clientId])
   @@index([sellerId])
   @@index([discountId])
+  @@index([tenantId])
   @@map("sales")
 }
 
 model SaleItem {
   id        String  @id @default(uuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   saleId    String
   sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   articleId String
@@ -352,6 +436,7 @@ model SaleItem {
   subtotal  Int
 
   @@index([articleId])
+  @@index([tenantId])
   @@map("sale_items")
 }
 
@@ -368,6 +453,8 @@ enum WorkSessionCloseReason {
 // de horas trabajadas aplica la regla de 2hs en vez de confiar en logoutAt.
 model WorkSession {
   id             String                  @id @default(uuid())
+  tenantId       String
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId         String
   user           User                    @relation(fields: [userId], references: [id])
   loginAt        DateTime                @default(now())
@@ -377,6 +464,7 @@ model WorkSession {
   createdAt      DateTime                @default(now())
 
   @@index([userId, loginAt])
+  @@index([tenantId])
   @@map("work_sessions")
 }
 
@@ -403,6 +491,8 @@ enum TreasuryEntrySource {
 // Cortes/Ventas (cutId/saleId), ver TreasuryService.
 model TreasuryEntry {
   id              String               @id @default(uuid())
+  tenantId        String
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   type            TreasuryEntryType
   expenseKind     TreasuryExpenseKind?
   categoryId      String
@@ -419,6 +509,7 @@ model TreasuryEntry {
   createdAt       DateTime             @default(now())
 
   @@index([categoryId])
+  @@index([tenantId])
   @@map("treasury_entries")
 }
 
@@ -427,13 +518,13 @@ enum Plan {
   INTEGRAL
 }
 
-// Modulo Plan Integral: fila unica por instalacion (mismo patron singleton
-// que AppointmentSettings). No hay multi-tenancy real de datos - cada
-// barberia es un deploy propio, este flag solo prende/apaga las
-// funcionalidades premium (proveedores, ordenes de compra, reportes). Lo
-// setea el rol DEV desde /admin/plan.
+// Modulo Plan Integral: una fila por tenant (tenantId es la propia primary
+// key) - antes era singleton global (id fijo en 1) cuando no habia
+// multi-tenancy real. Lo setea el rol DEV de cada barberia desde
+// /admin/plan.
 model OrganizationSettings {
-  id        Int      @id @default(1)
+  tenantId  String   @id
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   plan      Plan     @default(BASICO)
   updatedAt DateTime @updatedAt
 
@@ -445,19 +536,22 @@ model OrganizationSettings {
 // precio (ver ProveedorProducto). Soft delete via active, mismo patron que
 // Article.
 model Proveedor {
-  id              String              @id @default(uuid())
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nombre          String
   contacto        String?
   telefono        String?
   email           String?
   condicionesPago String?
-  active          Boolean             @default(true)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   productos ProveedorProducto[]
   ordenes   OrdenCompra[]
 
+  @@index([tenantId])
   @@map("proveedores")
 }
 
@@ -466,6 +560,8 @@ model Proveedor {
 // proveedor en las ordenes de compra automaticas.
 model ProveedorProducto {
   id                String    @id @default(uuid())
+  tenantId          String
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   proveedorId       String
   proveedor         Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
   articleId         String
@@ -477,6 +573,7 @@ model ProveedorProducto {
   updatedAt         DateTime  @updatedAt
 
   @@unique([proveedorId, articleId])
+  @@index([tenantId])
   @@map("proveedor_productos")
 }
 
@@ -494,6 +591,8 @@ enum OrdenCompraEstado {
 // BORRADOR; RECIBIDA da de alta el stock via StockService.increaseStock.
 model OrdenCompra {
   id                String            @id @default(uuid())
+  tenantId          String
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   proveedorId       String
   proveedor         Proveedor         @relation(fields: [proveedorId], references: [id])
   estado            OrdenCompraEstado @default(BORRADOR)
@@ -506,18 +605,19 @@ model OrdenCompra {
 
   items OrdenCompraItem[]
 
+  @@index([tenantId])
   @@map("ordenes_compra")
 }
 
-// Modulo Landing publica: nombre, contacto y tema de marca del tenant. Fila
-// unica (id fijo en 1), mismo patron singleton que OrganizationSettings/
-// AppointmentSettings. Reemplaza el config que vivia hardcodeado en el
-// frontend (business.config.ts): con eso, personalizar una instalacion
-// implicaba tocar codigo y redeployar, lo cual no escala a multi-tenant.
+// Modulo Landing publica: nombre, contacto y tema de marca del tenant. Una
+// fila por tenant (tenantId es la propia primary key) - antes era singleton
+// global (id fijo en 1), lo cual asumia un solo negocio por deploy.
 // Editable desde /admin/negocio (Dev y Encargado), lectura publica sin auth
-// (la landing no tiene sesion) via publicBusinessSettingsRouter.
+// (la landing no tiene sesion) via publicBusinessSettingsRouter resolviendo
+// el tenant por slug (ver app.ts).
 model BusinessSettings {
-  id               Int      @id @default(1)
+  tenantId         String   @id
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name             String   @default("Mi Barberia")
   tagline          String   @default("")
   logoUrl          String?
@@ -551,6 +651,8 @@ model BusinessSettings {
 
 model OrdenCompraItem {
   id             String      @id @default(uuid())
+  tenantId       String
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   ordenId        String
   orden          OrdenCompra @relation(fields: [ordenId], references: [id], onDelete: Cascade)
   articleId      String
@@ -560,6 +662,7 @@ model OrdenCompraItem {
   createdAt      DateTime    @default(now())
 
   @@unique([ordenId, articleId])
+  @@index([tenantId])
   @@map("orden_compra_items")
 }
 
@@ -597,7 +700,9 @@ enum DiscountType {
 // maxUsesPerUser queda sin aplicar por ahora (ver discounts.service.ts).
 model Discount {
   id                   String        @id @default(uuid())
-  code                 String        @unique
+  tenantId             String
+  tenant               Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code                 String
   name                 String
   type                 DiscountType
   scope                DiscountScope @default(MERCH)
@@ -620,6 +725,8 @@ model Discount {
   cuts         Cut[]
   sales        Sale[]
 
+  @@unique([tenantId, code])
+  @@index([tenantId])
   @@map("discounts")
 }
 

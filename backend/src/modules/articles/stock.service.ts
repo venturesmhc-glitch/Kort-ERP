@@ -1,10 +1,8 @@
-import type { Prisma } from '@prisma/client';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, type Db } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { getOrganizationSettings } from '../settings/settings.service.js';
 import { PurchaseOrdersService } from '../purchase-orders/purchase-orders.service.js';
-
-type Db = Prisma.TransactionClient | typeof prisma;
 
 // db es opcional para poder componer esto dentro de la transaccion de otro
 // modulo (ver Ventas: crea el Sale y descuenta stock atomicamente, todo junto
@@ -36,7 +34,9 @@ async function applyMovement(
       where: { id: articleId },
       data: { stock: nextStock },
     });
-    await tx.stockMovement.create({ data: { articleId, type, quantity, reason } });
+    await tx.stockMovement.create({
+      data: { tenantId: getTenantId(), articleId, type, quantity, reason },
+    });
 
     // Plan Integral: si el movimiento dejo el articulo bajo stockMinimo,
     // genera/actualiza el borrador de orden de compra en la misma
@@ -62,10 +62,10 @@ async function applyMovement(
 // descuenta hasta el retiro) - si el pedido de merch se cancela, el stock se
 // repone con increaseStock (ver merch.service.ts).
 export const StockService = {
-  decreaseStock(articleId: string, quantity: number, reason?: string, tx?: Prisma.TransactionClient) {
+  decreaseStock(articleId: string, quantity: number, reason?: string, tx?: Db) {
     return applyMovement(articleId, 'OUT', quantity, reason, tx ?? prisma);
   },
-  increaseStock(articleId: string, quantity: number, reason?: string, tx?: Prisma.TransactionClient) {
+  increaseStock(articleId: string, quantity: number, reason?: string, tx?: Db) {
     return applyMovement(articleId, 'IN', quantity, reason, tx ?? prisma);
   },
 };

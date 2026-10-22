@@ -28,6 +28,11 @@ const upload = multer({
 // publica no tiene sesion (ver publicBusinessSettingsRouter).
 export const businessSettingsRouter = Router();
 businessSettingsRouter.use(verifyToken);
+// A diferencia de PUT (solo Dev/Encargado), el GET autenticado es para
+// cualquier rol logueado: el panel admin entero (AdminLayout) necesita la
+// marca del negocio para tematizarse, no solo quien la edita. Sin slug en la
+// URL (ver router.tsx), el tenant sale del JWT (ver lib/prisma.ts).
+businessSettingsRouter.get('/', asyncHandler(getBusinessSettingsHandler));
 businessSettingsRouter.put('/', authorize('DEV', 'ENCARGADO'), asyncHandler(updateBusinessSettingsHandler));
 businessSettingsRouter.post(
   '/image/:field',

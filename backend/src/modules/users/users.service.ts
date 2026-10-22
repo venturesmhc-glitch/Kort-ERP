@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import type { Role } from '@prisma/client';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors.js';
 import type { AuthUser } from '../../middleware/auth.js';
@@ -63,6 +64,7 @@ export async function createUser(input: CreateUserInput, actingUser: AuthUser) {
 
   return prisma.user.create({
     data: {
+      tenantId: getTenantId(),
       firstName: input.firstName,
       lastName: input.lastName,
       email: input.email,

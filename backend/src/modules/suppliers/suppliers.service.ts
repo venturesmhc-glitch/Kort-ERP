@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
+import { getTenantId } from '../../lib/tenantContext.js';
 import { NotFoundError } from '../../utils/errors.js';
 import type {
   CreateSupplierInput,
@@ -44,7 +45,7 @@ export async function getSupplier(id: string) {
 
 export function createSupplier(input: CreateSupplierInput) {
   return prisma.proveedor.create({
-    data: { ...input, email: input.email || undefined },
+    data: { ...input, email: input.email || undefined, tenantId: getTenantId() },
     include: PRODUCT_INCLUDE,
   });
 }
@@ -82,6 +83,7 @@ export async function upsertSupplierProduct(supplierId: string, input: UpsertSup
     return tx.proveedorProducto.upsert({
       where: { proveedorId_articleId: { proveedorId: supplierId, articleId: input.articleId } },
       create: {
+        tenantId: getTenantId(),
         proveedorId: supplierId,
         articleId: input.articleId,
         precioCosto: input.precioCosto,

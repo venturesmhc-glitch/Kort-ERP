@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useParams } from 'react-router-dom';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useBusinessSettings } from '../modules/business-settings/BusinessSettingsContext';
 import { useBusinessTheme } from '../config/useBusinessTheme';
@@ -8,6 +8,8 @@ import { IconHome, IconCalendar, IconStock, IconContact } from '../components/ic
 export function PublicLayout() {
   useBusinessTheme();
   const { settings, loading } = useBusinessSettings();
+  const { slug } = useParams<{ slug: string }>();
+  const base = `/t/${slug}`;
 
   const { name, logoUrl, headerImageUrl, footerImageUrl, badge, poweredBy } = settings;
   const year = new Date().getFullYear();
@@ -28,7 +30,7 @@ export function PublicLayout() {
       >
         {headerImageUrl && <div className="public-header-overlay" aria-hidden="true" />}
         <div className="public-header-content">
-          <NavLink to="/" end className="public-brand">
+          <NavLink to={base} end className="public-brand">
             {loading ? (
               <span className="public-logo-skeleton skeleton" aria-hidden="true" />
             ) : logoUrl && !logoBroken ? (
@@ -48,19 +50,19 @@ export function PublicLayout() {
             )}
           </NavLink>
           <nav className="public-nav">
-            <NavLink to="/" end>
+            <NavLink to={base} end>
               <IconHome aria-hidden="true" />
               Inicio
             </NavLink>
-            <NavLink to="/turnos">
+            <NavLink to={`${base}/turnos`}>
               <IconCalendar aria-hidden="true" />
               Solicitar turno
             </NavLink>
-            <NavLink to="/tienda">
+            <NavLink to={`${base}/tienda`}>
               <IconStock aria-hidden="true" />
               Tienda
             </NavLink>
-            <NavLink to="/contacto">
+            <NavLink to={`${base}/contacto`}>
               <IconContact aria-hidden="true" />
               Contacto
             </NavLink>

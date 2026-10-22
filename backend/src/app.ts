@@ -29,6 +29,7 @@ import {
 } from './modules/business-settings/business-settings.routes.js';
 import { notificationsRouter } from './modules/notifications/notifications.routes.js';
 import { discountsRouter, publicDiscountsRouter } from './modules/discounts/discounts.routes.js';
+import { resolveTenantFromSlug } from './middleware/resolveTenantFromSlug.js';
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, (char) => (char === '*' ? char : `\\${char}`));
@@ -81,28 +82,34 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/clients', clientsRouter);
 app.use('/api/catalogs', catalogsRouter);
-app.use('/api/public/catalogs', publicCatalogsRouter);
 app.use('/api/users', usersRouter);
-app.use('/api/public', publicUsersRouter);
 app.use('/api/appointments', appointmentsRouter);
-app.use('/api/public/appointments', publicAppointmentsRouter);
 app.use('/api/cuts', cutsRouter);
 app.use('/api/articles', articlesRouter);
-app.use('/api/public/articles', publicArticlesRouter);
 app.use('/api/sales', salesRouter);
 app.use('/api/treasury', treasuryRouter);
 app.use('/api/workshifts', workshiftsRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/merch', merchRouter);
-app.use('/api/public/merch', publicMerchRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/purchase-orders', purchaseOrdersRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/business-settings', businessSettingsRouter);
-app.use('/api/public/business-settings', publicBusinessSettingsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/discounts', discountsRouter);
-app.use('/api/public/discounts', publicDiscountsRouter);
+
+// Wizard publico de turnos / tienda de merch: sin JWT, el tenant se resuelve
+// por el slug en la URL (ver middleware/resolveTenantFromSlug.ts). El
+// frontend publico vive bajo /t/:slug/... y arma estas URLs con ese mismo
+// slug (ver frontend/src/lib/apiClient.ts).
+const PUBLIC_TENANT_PREFIX = '/api/public/t/:tenantSlug';
+app.use(`${PUBLIC_TENANT_PREFIX}/catalogs`, resolveTenantFromSlug, publicCatalogsRouter);
+app.use(PUBLIC_TENANT_PREFIX, resolveTenantFromSlug, publicUsersRouter);
+app.use(`${PUBLIC_TENANT_PREFIX}/appointments`, resolveTenantFromSlug, publicAppointmentsRouter);
+app.use(`${PUBLIC_TENANT_PREFIX}/articles`, resolveTenantFromSlug, publicArticlesRouter);
+app.use(`${PUBLIC_TENANT_PREFIX}/merch`, resolveTenantFromSlug, publicMerchRouter);
+app.use(`${PUBLIC_TENANT_PREFIX}/business-settings`, resolveTenantFromSlug, publicBusinessSettingsRouter);
+app.use(`${PUBLIC_TENANT_PREFIX}/discounts`, resolveTenantFromSlug, publicDiscountsRouter);
 
 app.use(errorHandler);

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useBusinessSettings } from '../business-settings/BusinessSettingsContext';
 import { Skeleton } from '../../components/AsyncState';
 import { IconBell, IconCalendar, IconStock } from '../../components/icons/NavIcons';
@@ -6,6 +6,8 @@ import { IconBell, IconCalendar, IconStock } from '../../components/icons/NavIco
 export function LandingHomePage() {
   const { settings, loading } = useBusinessSettings();
   const { address, hours } = settings.contact;
+  const { slug } = useParams<{ slug: string }>();
+  const base = `/t/${slug}`;
 
   return (
     <div>
@@ -23,10 +25,10 @@ export function LandingHomePage() {
             settings.tagline && <p>{settings.tagline}</p>
           )}
           <div className="landing-hero-actions">
-            <Link to="/turnos" className="button-primary landing-cta">
+            <Link to={`${base}/turnos`} className="button-primary landing-cta">
               Solicitar turno
             </Link>
-            <Link to="/tienda" className="button-secondary landing-cta">
+            <Link to={`${base}/tienda`} className="button-secondary landing-cta">
               Ver tienda
             </Link>
           </div>
@@ -75,7 +77,7 @@ export function LandingHomePage() {
             {address && <div className="landing-info-row">{address}</div>}
             {hours && <div className="landing-info-row text-muted">{hours}</div>}
           </div>
-          <Link to="/contacto" className="button-secondary">
+          <Link to={`${base}/contacto`} className="button-secondary">
             Como llegar
           </Link>
         </section>

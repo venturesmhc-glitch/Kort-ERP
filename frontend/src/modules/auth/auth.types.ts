@@ -6,6 +6,7 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   role: Role;
+  tenantSlug: string;
 }
 
 export interface LoginResponse {
