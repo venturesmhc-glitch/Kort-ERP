@@ -5,6 +5,7 @@ import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { StockService } from '../articles/stock.service.js';
 import { TreasuryService } from '../treasury/treasury.service.js';
 import { incrementUsesCount } from '../discounts/discounts.service.js';
+import { recordClientActivity } from '../loyalty/loyalty.service.js';
 import type { CheckoutInput, UpdateMerchStatusInput } from './merch.schema.js';
 
 const MERCH_SALE_INCLUDE = {
@@ -118,6 +119,10 @@ export async function updateMerchOrderStatus(id: string, input: UpdateMerchStatu
     });
 
     await TreasuryService.recordIncomeFromSale(tx, result);
+
+    if (result.clientId) {
+      await recordClientActivity(tx, result.clientId, result.totalAmount, { saleId: result.id }, `Pedido merch ${result.id}`);
+    }
 
     return result;
   });

@@ -1,17 +1,9 @@
 import cron from 'node-cron';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
-import { sendWhatsappTemplate } from '../../lib/notifications/whatsappProvider.js';
+import { normalizeWhatsappPhone, sendWhatsappTemplate } from '../../lib/notifications/whatsappProvider.js';
 
 const MAX_ATTEMPTS = 3;
-
-// Cliente.phone es texto libre (ver clients.schema.ts) - normaliza a
-// "solo digitos, con codigo de pais" para la API de WhatsApp. Best-effort: si
-// el numero ya trae codigo de pais lo respeta, si no le antepone el default.
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  return digits.startsWith(env.whatsappDefaultCountryCode) ? digits : `${env.whatsappDefaultCountryCode}${digits}`;
-}
 
 async function processDueReminder(notification: {
   id: string;
@@ -33,7 +25,8 @@ async function processDueReminder(notification: {
 
   try {
     await sendWhatsappTemplate({
-      to: normalizePhone(appointment.client.phone),
+      to: normalizeWhatsappPhone(appointment.client.phone),
+      templateName: env.whatsappReminderTemplate,
       bodyParams: [appointment.client.firstName, fecha, appointment.barbero.firstName, appointment.code],
     });
     await prisma.scheduledNotification.update({
