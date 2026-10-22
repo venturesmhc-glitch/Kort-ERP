@@ -17,6 +17,9 @@ export const userBaseFields = {
   dni: z.string().optional(),
   phone: z.string().optional(),
   address: z.string().optional(),
+  // Porcentaje de comision sobre cortes/ventas que registra este usuario
+  // (ver modulo Comisiones). Sin valor = no cobra comision (sueldo fijo).
+  commissionRate: z.coerce.number().int().min(0).max(100).optional(),
 };
 
 export const userPasswordSchema = z

@@ -4,6 +4,8 @@ import { ConflictError, NotFoundError } from '../../utils/errors.js';
 import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { TreasuryService } from '../treasury/treasury.service.js';
 import { calculateCorteDiscountAmount, incrementUsesCount } from '../discounts/discounts.service.js';
+import { recordClientActivity } from '../loyalty/loyalty.service.js';
+import { scheduleReviewRequest } from '../notifications/clientMessages.service.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import type { CreateCutInput } from './cuts.schema.js';
 
@@ -104,9 +106,12 @@ export async function createCut(input: CreateCutInput, user: AuthUser) {
       }
 
       await TreasuryService.recordIncomeFromCut(tx, created);
+      await recordClientActivity(tx, client.id, finalPrice, { cutId: created.id }, `Corte ${created.id}`);
 
       return created;
     });
+
+    await scheduleReviewRequest(cut);
 
     return cut;
   } catch (error) {
@@ -146,7 +151,7 @@ export async function createCutFromAppointment(appointmentId: string) {
   }
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const cut = await prisma.$transaction(async (tx) => {
       let finalPrice = price;
       let discountId: string | undefined;
       let discountAmount: number | undefined;
@@ -179,9 +184,14 @@ export async function createCutFromAppointment(appointmentId: string) {
       });
 
       await TreasuryService.recordIncomeFromCut(tx, created);
+      await recordClientActivity(tx, appointment.clientId, finalPrice, { cutId: created.id }, `Corte ${created.id}`);
 
       return created;
     });
+
+    await scheduleReviewRequest(cut);
+
+    return cut;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       // Choco con otro request concurrente que ya lo creo - no es un error real.

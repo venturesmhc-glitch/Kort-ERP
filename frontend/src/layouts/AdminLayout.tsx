@@ -24,6 +24,7 @@ import {
   IconBusiness,
   IconDiscount,
   IconPlan,
+  IconSettings,
   IconClose,
   IconLogout,
   IconExternal,
@@ -69,6 +70,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/admin/reportes', label: 'Reportes', roles: ['DEV', 'ENCARGADO', 'BARBERO'], icon: IconReports },
   { to: '/admin/usuarios', label: 'Usuarios', roles: ['DEV', 'ENCARGADO'], icon: IconUsers },
   { to: '/admin/jornadas', label: 'Jornadas laborales', roles: ['DEV', 'ENCARGADO'], icon: IconSchedule },
+  { to: '/admin/comisiones', label: 'Comisiones', roles: ['DEV', 'ENCARGADO'], icon: IconTreasury },
+  { to: '/admin/fidelizacion', label: 'Fidelizacion y retencion', roles: ['DEV', 'ENCARGADO'], icon: IconSettings },
   { to: '/admin/negocio', label: 'Datos del negocio', roles: ['DEV', 'ENCARGADO'], icon: IconBusiness },
   { to: '/admin/plan', label: 'Plan', roles: ['DEV'], icon: IconPlan },
 ];

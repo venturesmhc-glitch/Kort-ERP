@@ -11,11 +11,14 @@ import type { ClientFormValues } from './clients.schema';
 import { EmptyState, ErrorState, PageSkeleton, toErrorMessage } from '../../components/AsyncState';
 import { useToast } from '../../components/toast/ToastProvider';
 import { useAuth } from '../auth/AuthContext';
+import { redeemLoyaltyPointsRequest } from '../loyalty/loyalty.api';
+import { getErrorMessage } from '../../lib/apiErrors';
 
 export function ClientsPage() {
   const toast = useToast();
   const { user } = useAuth();
   const canDelete = user?.role === 'DEV' || user?.role === 'ENCARGADO';
+  const canRedeem = user?.role === 'DEV' || user?.role === 'ENCARGADO';
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +65,26 @@ export function ClientsPage() {
     }
   }
 
+  async function handleRedeem(client: Client) {
+    const input = window.prompt(
+      `${client.firstName} ${client.lastName} tiene ${client.loyaltyPoints} puntos. ¿Cuántos querés canjear?`,
+      String(client.loyaltyPoints)
+    );
+    if (!input) return;
+    const points = Number(input);
+    if (!Number.isInteger(points) || points <= 0) {
+      toast.error('Ingresa una cantidad de puntos valida');
+      return;
+    }
+    try {
+      const discount = await redeemLoyaltyPointsRequest(client.id, points);
+      toast.success(`Cupon generado: ${discount.code} ($${discount.value} de descuento)`);
+      await loadClients();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'No se pudo canjear los puntos'));
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -101,6 +124,7 @@ export function ClientsPage() {
                 <th>Nombre</th>
                 <th>Apellido</th>
                 <th>Telefono</th>
+                <th>Puntos</th>
                 <th></th>
               </tr>
             </thead>
@@ -110,10 +134,16 @@ export function ClientsPage() {
                   <td data-label="Nombre">{client.firstName}</td>
                   <td data-label="Apellido">{client.lastName}</td>
                   <td data-label="Telefono">{client.phone}</td>
+                  <td data-label="Puntos">{client.loyaltyPoints}</td>
                   <td className="data-table-actions" data-label="">
                     <button type="button" onClick={() => setEditingClient(client)}>
                       Editar
                     </button>
+                    {canRedeem && client.loyaltyPoints > 0 && (
+                      <button type="button" onClick={() => handleRedeem(client)}>
+                        Canjear puntos
+                      </button>
+                    )}
                     {canDelete && (
                       <button type="button" onClick={() => handleDelete(client.id)}>
                         Eliminar
@@ -124,7 +154,7 @@ export function ClientsPage() {
               ))}
               {clients.length === 0 && (
                 <tr>
-                  <td colSpan={4} data-label="">
+                  <td colSpan={5} data-label="">
                     <EmptyState message="No hay clientes cargados todavia." />
                   </td>
                 </tr>

@@ -42,6 +42,12 @@ export const env = {
   whatsappToken: process.env.WHATSAPP_TOKEN,
   whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
   whatsappReminderTemplate: process.env.WHATSAPP_REMINDER_TEMPLATE ?? 'recordatorio_turno',
+  // Plantillas del modulo Fidelizacion y Retencion (ver
+  // notifications/clientMessages.service.ts): solicitud de resena tras un
+  // corte y reactivacion de clientes inactivos. Cada una necesita su propia
+  // aprobacion en Meta Business Manager, igual que la de recordatorio.
+  whatsappReviewTemplate: process.env.WHATSAPP_REVIEW_TEMPLATE ?? 'solicitud_resena',
+  whatsappReactivationTemplate: process.env.WHATSAPP_REACTIVATION_TEMPLATE ?? 'reactivacion_cliente',
   whatsappTemplateLang: process.env.WHATSAPP_TEMPLATE_LANG ?? 'es_AR',
   // Cliente.phone se carga a mano (sin formato forzado, ver clients.schema.ts)
   // - se usa para anteponer el codigo de pais cuando el numero no lo trae.

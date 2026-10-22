@@ -85,6 +85,7 @@ export function UsersPage() {
             phone: editingUser.phone ?? '',
             address: editingUser.address ?? '',
             active: editingUser.active,
+            commissionRate: editingUser.commissionRate,
             password: '',
           }}
           isEditing
@@ -106,6 +107,7 @@ export function UsersPage() {
                 <th>Email</th>
                 <th>Rol</th>
                 <th>Telefono</th>
+                <th>Comision</th>
                 <th>Estado</th>
                 <th></th>
               </tr>
@@ -119,6 +121,7 @@ export function UsersPage() {
                   <td data-label="Email">{user.email}</td>
                   <td data-label="Rol">{user.role}</td>
                   <td data-label="Telefono">{user.phone ?? '-'}</td>
+                  <td data-label="Comision">{user.commissionRate != null ? `${user.commissionRate}%` : '-'}</td>
                   <td data-label="Estado">
                     <StatusBadge tone={user.active ? 'success' : 'muted'}>
                       {user.active ? 'Activo' : 'Inactivo'}
@@ -138,7 +141,7 @@ export function UsersPage() {
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={6} data-label="">
+                  <td colSpan={7} data-label="">
                     <EmptyState message="No hay usuarios cargados todavia." />
                   </td>
                 </tr>

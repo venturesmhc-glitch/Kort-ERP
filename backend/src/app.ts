@@ -29,6 +29,9 @@ import {
 } from './modules/business-settings/business-settings.routes.js';
 import { notificationsRouter } from './modules/notifications/notifications.routes.js';
 import { discountsRouter, publicDiscountsRouter } from './modules/discounts/discounts.routes.js';
+import { growthSettingsRouter } from './modules/growth-settings/growth-settings.routes.js';
+import { loyaltyRouter } from './modules/loyalty/loyalty.routes.js';
+import { commissionsRouter } from './modules/commissions/commissions.routes.js';
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, (char) => (char === '*' ? char : `\\${char}`));
@@ -80,6 +83,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/clients', clientsRouter);
+app.use('/api/clients', loyaltyRouter);
 app.use('/api/catalogs', catalogsRouter);
 app.use('/api/public/catalogs', publicCatalogsRouter);
 app.use('/api/users', usersRouter);
@@ -104,5 +108,7 @@ app.use('/api/public/business-settings', publicBusinessSettingsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/discounts', discountsRouter);
 app.use('/api/public/discounts', publicDiscountsRouter);
+app.use('/api/growth-settings', growthSettingsRouter);
+app.use('/api/commissions', commissionsRouter);
 
 app.use(errorHandler);

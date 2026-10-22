@@ -31,24 +31,28 @@ enum AppointmentStatus {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  firstName String
-  lastName  String
-  role      Role
+  id             String   @id @default(uuid())
+  email          String   @unique
+  password       String
+  firstName      String
+  lastName       String
+  role           Role
   // Independiente del rol: un Encargado (o Dev) puede tambien atender turnos
   // y cortes como si fuera Barbero. role=BARBERO siempre implica esBarbero=true
   // (forzado en users.service.ts); para el resto de los roles es un toggle
   // editable desde el formulario de Usuarios (ver skills.md: "al sacar el
   // turno no dejaba elegir a un Encargado que tambien corta").
-  esBarbero Boolean  @default(false)
-  dni       String?  @unique
-  phone     String?
-  address   String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  esBarbero      Boolean  @default(false)
+  dni            String?  @unique
+  phone          String?
+  address        String?
+  active         Boolean  @default(true)
+  // Porcentaje de comision (0-100) sobre el monto de cada corte/venta que
+  // registra este usuario (ver modulo Comisiones). Null = no cobra
+  // comision (sueldo fijo) - default para no alterar a nadie existente.
+  commissionRate Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   workSchedules WorkSchedule[]
   appointments  Appointment[]
@@ -60,20 +64,119 @@ model User {
 }
 
 model Client {
-  id        String   @id @default(uuid())
-  firstName String
-  lastName  String
-  phone     String   @unique
-  email     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                     String    @id @default(uuid())
+  firstName              String
+  lastName               String
+  phone                  String    @unique
+  email                  String?
+  // Fidelizacion y retencion (ver modulo Growth/loyalty.service.ts):
+  // loyaltyPoints es un contador cacheado (mismo patron que Article.stock),
+  // actualizado junto con cada LoyaltyTransaction. lastVisitAt se actualiza
+  // en Cortes/Ventas/Merch entregado (no en Turnos: reservar no es visitar)
+  // y alimenta el barrido de reactivacion de clientes inactivos.
+  // lastReactivationSentAt evita reenviar el mensaje de reactivacion antes
+  // del cooldown configurado en GrowthSettings.
+  loyaltyPoints          Int       @default(0)
+  lastVisitAt            DateTime?
+  lastReactivationSentAt DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
-  appointments Appointment[]
-  cuts         Cut[]
-  sales        Sale[]
+  appointments            Appointment[]
+  cuts                    Cut[]
+  sales                   Sale[]
+  loyaltyTransactions     LoyaltyTransaction[]
+  scheduledClientMessages ScheduledClientMessage[]
 
   @@index([createdAt])
   @@map("clients")
+}
+
+enum LoyaltyTransactionType {
+  EARN
+  REDEEM
+  ADJUST
+}
+
+// Ledger de puntos de fidelidad (mismo patron que StockMovement: contador
+// cacheado en Client.loyaltyPoints + historial inmutable aca). EARN se
+// genera automaticamente al registrar un Corte/Venta/pedido Merch entregado
+// (ver loyalty.service.ts recordClientActivity); REDEEM se genera al
+// canjear puntos por un cupon de descuento (discountId apunta al Discount
+// generado). points siempre se guarda positivo, el signo lo da el type.
+model LoyaltyTransaction {
+  id          String                 @id @default(uuid())
+  clientId    String
+  client      Client                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  type        LoyaltyTransactionType
+  points      Int
+  description String
+  cutId       String?
+  saleId      String?
+  discountId  String?
+  createdAt   DateTime               @default(now())
+
+  @@index([clientId])
+  @@map("loyalty_transactions")
+}
+
+enum ClientMessageKind {
+  REVIEW_REQUEST
+  REACTIVATION
+}
+
+// Mensajes de WhatsApp al cliente final fuera del flujo de turnos (ver
+// ScheduledNotification, exclusivo de recordatorios de turno): encuesta de
+// satisfaccion/pedido de resena tras un Corte, y reactivacion de clientes
+// inactivos. Mismo patron de persistencia + cron corto que
+// ScheduledNotification (el proceso puede reiniciarse, Render free duerme
+// el servicio) - ver notifications/clientMessages.service.ts. cutId es solo
+// trazabilidad (no FK, un Corte puede borrarse sin arrastrar este registro).
+model ScheduledClientMessage {
+  id        String                      @id @default(uuid())
+  kind      ClientMessageKind
+  clientId  String
+  client    Client                      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  cutId     String?
+  sendAt    DateTime
+  status    ScheduledNotificationStatus @default(PENDING)
+  attempts  Int                         @default(0)
+  lastError String?
+  sentAt    DateTime?
+  createdAt DateTime                    @default(now())
+
+  @@index([status, sendAt])
+  @@index([clientId])
+  @@map("scheduled_client_messages")
+}
+
+// Configuracion global de Fidelizacion y Retencion (ver skills.md: fuera
+// del spec original, modulo nuevo de venta/retencion). Fila unica (id fijo
+// en 1), mismo patron singleton que AppointmentSettings/OrganizationSettings.
+// reactivationDiscountId no es FK (mismo criterio que
+// Discount.applicableItems): se valida contra el catalogo real en
+// growth-settings.service.ts antes de guardar, sin atar el modelo a un
+// borrado en cascada.
+model GrowthSettings {
+  id                       Int      @id @default(1)
+  loyaltyEnabled           Boolean  @default(false)
+  // Pesos gastados (en Cortes/Ventas/Merch) por cada punto otorgado.
+  loyaltyEarnRatio         Int      @default(100)
+  // Pesos de descuento que vale cada punto al canjearse.
+  loyaltyRedeemRatio       Int      @default(10)
+  reactivationEnabled      Boolean  @default(false)
+  // Dias sin visitar (ver Client.lastVisitAt) para considerar "inactivo".
+  reactivationInactiveDays Int      @default(45)
+  // Dias minimos entre dos mensajes de reactivacion al mismo cliente.
+  reactivationCooldownDays Int      @default(30)
+  reactivationDiscountId   String?
+  reviewRequestEnabled     Boolean  @default(false)
+  // Horas despues de registrar el corte para pedir la resena.
+  reviewRequestDelayHours  Int      @default(2)
+  googleReviewUrl          String?
+  updatedAt                DateTime @updatedAt
+
+  @@map("growth_settings")
 }
 
 // Modulo Turnos: horario semanal de atencion por barbero. El lapso por turno
@@ -123,8 +226,8 @@ model Appointment {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  cut Cut?
-  merchSale Sale?
+  cut                    Cut?
+  merchSale              Sale?
   scheduledNotifications ScheduledNotification[]
 
   @@unique([barberoId, scheduledAt])
@@ -154,16 +257,16 @@ enum ScheduledNotificationStatus {
 // pocos minutos. La confirmacion por mail es sincrona (se envia al crear el
 // turno) y no pasa por esta tabla.
 model ScheduledNotification {
-  id            String                       @id @default(uuid())
+  id            String                      @id @default(uuid())
   appointmentId String
-  appointment   Appointment                  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointment   Appointment                 @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   channel       NotificationChannel
   sendAt        DateTime
-  status        ScheduledNotificationStatus  @default(PENDING)
-  attempts      Int                          @default(0)
+  status        ScheduledNotificationStatus @default(PENDING)
+  attempts      Int                         @default(0)
   lastError     String?
   sentAt        DateTime?
-  createdAt     DateTime                     @default(now())
+  createdAt     DateTime                    @default(now())
 
   @@index([status, sendAt])
   @@map("scheduled_notifications")
@@ -172,25 +275,25 @@ model ScheduledNotification {
 // Modulo Registro de cortes. El precio es un snapshot copiado de
 // ParameterItem.price al momento del corte, no una referencia (ver Cut.price).
 model Cut {
-  id            String        @id @default(uuid())
-  clientId      String
-  client        Client        @relation(fields: [clientId], references: [id])
-  barberoId     String
-  barbero       User          @relation(fields: [barberoId], references: [id])
-  tipoCorteId   String
-  tipoCorte     ParameterItem @relation(fields: [tipoCorteId], references: [id])
+  id             String        @id @default(uuid())
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id])
+  barberoId      String
+  barbero        User          @relation(fields: [barberoId], references: [id])
+  tipoCorteId    String
+  tipoCorte      ParameterItem @relation(fields: [tipoCorteId], references: [id])
   // price ya es el precio final (con descuento aplicado si corresponde) - ver
   // cuts.service.ts createCut. discountId/discountAmount quedan solo como
   // traza para reportes, no se usan para recalcular nada.
-  price         Int
-  discountId      String?
-  discount        Discount?     @relation(fields: [discountId], references: [id])
-  discountAmount  Int?
-  photoUrl      String?
-  appointmentId String?       @unique
-  appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
-  cutAt         DateTime      @default(now())
-  createdAt     DateTime      @default(now())
+  price          Int
+  discountId     String?
+  discount       Discount?     @relation(fields: [discountId], references: [id])
+  discountAmount Int?
+  photoUrl       String?
+  appointmentId  String?       @unique
+  appointment    Appointment?  @relation(fields: [appointmentId], references: [id])
+  cutAt          DateTime      @default(now())
+  createdAt      DateTime      @default(now())
 
   treasuryEntry TreasuryEntry?
 
@@ -254,23 +357,23 @@ enum StockMovementType {
 // ver PurchaseOrdersService.syncDraftForArticle): bajo minimo = alerta
 // amarilla, bajo critico = alerta roja y dispara borrador de compra.
 model Article {
-  id              String              @id @default(uuid())
-  name            String
-  description     String?
-  tipoProductoId  String
-  tipoProducto    ParameterItem       @relation(fields: [tipoProductoId], references: [id])
-  price           Int
-  imageUrl        String?
-  stock           Int                 @default(0)
-  stockMinimo     Int?
-  stockCritico    Int?
-  active          Boolean             @default(true)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  movements       StockMovement[]
-  saleItems       SaleItem[]
-  proveedores     ProveedorProducto[]
-  ordenItems      OrdenCompraItem[]
+  id             String              @id @default(uuid())
+  name           String
+  description    String?
+  tipoProductoId String
+  tipoProducto   ParameterItem       @relation(fields: [tipoProductoId], references: [id])
+  price          Int
+  imageUrl       String?
+  stock          Int                 @default(0)
+  stockMinimo    Int?
+  stockCritico   Int?
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  movements      StockMovement[]
+  saleItems      SaleItem[]
+  proveedores    ProveedorProducto[]
+  ordenItems     OrdenCompraItem[]
 
   @@map("articles")
 }
@@ -313,23 +416,23 @@ enum SaleStatus {
 // vinculo opcional con el turno cuando el pedido surge del flujo "ver
 // mercancia" del wizard publico (ver appointments.service.ts).
 model Sale {
-  id            String      @id @default(uuid())
-  channel       SaleChannel @default(POS)
-  status        SaleStatus  @default(COMPLETED)
-  clientId      String?
-  client        Client?     @relation(fields: [clientId], references: [id])
-  sellerId      String?
-  seller        User?       @relation(fields: [sellerId], references: [id])
-  appointmentId String?     @unique
-  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
-  totalAmount   Int
+  id             String       @id @default(uuid())
+  channel        SaleChannel  @default(POS)
+  status         SaleStatus   @default(COMPLETED)
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id])
+  sellerId       String?
+  seller         User?        @relation(fields: [sellerId], references: [id])
+  appointmentId  String?      @unique
+  appointment    Appointment? @relation(fields: [appointmentId], references: [id])
+  totalAmount    Int
   // totalAmount ya viene con el descuento restado (POS: al crear la venta;
   // Merch: al confirmar el turno vinculado, ver appointments.service.ts).
   // discountId/discountAmount quedan como traza, no se usan para recalcular.
   discountId     String?
-  discount       Discount?   @relation(fields: [discountId], references: [id])
+  discount       Discount?    @relation(fields: [discountId], references: [id])
   discountAmount Int?
-  createdAt     DateTime    @default(now())
+  createdAt      DateTime     @default(now())
 
   items         SaleItem[]
   treasuryEntry TreasuryEntry?
@@ -445,15 +548,15 @@ model OrganizationSettings {
 // precio (ver ProveedorProducto). Soft delete via active, mismo patron que
 // Article.
 model Proveedor {
-  id              String              @id @default(uuid())
+  id              String   @id @default(uuid())
   nombre          String
   contacto        String?
   telefono        String?
   email           String?
   condicionesPago String?
-  active          Boolean             @default(true)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   productos ProveedorProducto[]
   ordenes   OrdenCompra[]

@@ -50,6 +50,12 @@ const BusinessSettingsPage = lazy(() =>
   import('./modules/business-settings/BusinessSettingsPage').then((m) => ({ default: m.BusinessSettingsPage }))
 );
 const DiscountsPage = lazy(() => import('./modules/discounts/DiscountsPage').then((m) => ({ default: m.DiscountsPage })));
+const ComisionesPage = lazy(() =>
+  import('./modules/comisiones/ComisionesPage').then((m) => ({ default: m.ComisionesPage }))
+);
+const GrowthSettingsPage = lazy(() =>
+  import('./modules/growth/GrowthSettingsPage').then((m) => ({ default: m.GrowthSettingsPage }))
+);
 
 export const router = createBrowserRouter([
   {
@@ -242,6 +248,22 @@ export const router = createBrowserRouter([
                 element: (
                   <Lazy>
                     <BusinessSettingsPage />
+                  </Lazy>
+                ),
+              },
+              {
+                path: 'comisiones',
+                element: (
+                  <Lazy>
+                    <ComisionesPage />
+                  </Lazy>
+                ),
+              },
+              {
+                path: 'fidelizacion',
+                element: (
+                  <Lazy>
+                    <GrowthSettingsPage />
                   </Lazy>
                 ),
               },

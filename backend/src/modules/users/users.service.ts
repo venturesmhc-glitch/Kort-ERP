@@ -16,6 +16,7 @@ const LIST_SELECT = {
   phone: true,
   address: true,
   active: true,
+  commissionRate: true,
 } as const;
 
 // role=BARBERO siempre puede atender turnos/cortes, sin importar lo que
@@ -73,6 +74,7 @@ export async function createUser(input: CreateUserInput, actingUser: AuthUser) {
       phone: input.phone || undefined,
       address: input.address || undefined,
       active: input.active ?? true,
+      commissionRate: input.commissionRate ?? null,
     },
     select: LIST_SELECT,
   });
@@ -110,6 +112,7 @@ export async function updateUser(id: string, input: UpdateUserInput, actingUser:
       phone: input.phone || null,
       address: input.address || null,
       active: input.active,
+      commissionRate: input.commissionRate ?? null,
       password: input.password ? await bcrypt.hash(input.password, 12) : undefined,
     },
     select: LIST_SELECT,

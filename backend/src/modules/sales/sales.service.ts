@@ -6,6 +6,7 @@ import { findOrCreateClientByPhone } from '../clients/clients.service.js';
 import { StockService } from '../articles/stock.service.js';
 import { TreasuryService } from '../treasury/treasury.service.js';
 import { calculateDiscountAmount, incrementUsesCount, resolveEligibleDiscount } from '../discounts/discounts.service.js';
+import { recordClientActivity } from '../loyalty/loyalty.service.js';
 import { paginationSkipTake, toPaginated } from '../../utils/pagination.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import type { CreateSaleInput, ListSalesQuery } from './sales.schema.js';
@@ -107,6 +108,10 @@ export async function createSale(input: CreateSaleInput, user: AuthUser) {
     }
 
     await TreasuryService.recordIncomeFromSale(tx, created);
+
+    if (clientId) {
+      await recordClientActivity(tx, clientId, totalAmount, { saleId: created.id }, `Venta ${created.id}`);
+    }
 
     return created;
   });
