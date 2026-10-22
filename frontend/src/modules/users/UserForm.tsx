@@ -161,6 +161,25 @@ export function UserForm({
       />
       {getFieldError(issues, 'address') && <p className="form-error">{getFieldError(issues, 'address')}</p>}
 
+      <label htmlFor="commissionRate">Comision (%)</label>
+      <input
+        id="commissionRate"
+        type="number"
+        min={0}
+        max={100}
+        placeholder="Deja vacio si cobra sueldo fijo"
+        value={values.commissionRate ?? ''}
+        onChange={(e) =>
+          setValues((prev) => ({
+            ...prev,
+            commissionRate: e.target.value === '' ? undefined : Number(e.target.value),
+          }))
+        }
+      />
+      {getFieldError(issues, 'commissionRate') && (
+        <p className="form-error">{getFieldError(issues, 'commissionRate')}</p>
+      )}
+
       <label htmlFor="password">{isEditing ? 'Nueva contrasena (opcional)' : 'Contrasena'}</label>
       <input
         id="password"

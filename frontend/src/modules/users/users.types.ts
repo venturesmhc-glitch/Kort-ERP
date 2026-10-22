@@ -11,6 +11,7 @@ export interface AppUser {
   phone?: string;
   address?: string;
   active: boolean;
+  commissionRate?: number;
 }
 
 export type UserInput = Omit<AppUser, 'id'> & { password?: string };

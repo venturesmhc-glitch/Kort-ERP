@@ -3,6 +3,7 @@ export interface Client {
   firstName: string;
   lastName: string;
   phone: string;
+  loyaltyPoints: number;
   createdAt: string;
   updatedAt: string;
 }
